@@ -257,6 +257,21 @@ Permite distribuir el trabajo desde las primeras fases del proyecto y equilibrar
 ✅ Aprobada
 
 ---
+## DEC-017: proyecto Maven con padre, servidor y cliente
+
+**Fecha:** 19/10/2026
+
+### Decisión
+Se toma la decision de crear el proyecto maven con una estructura de padre, cliente y servidor.
+
+
+### Justificación
+Permite compartir el proyecto sin que haya errores de compatibilidad entre los diferentes programadores.
+
+### Estado
+✅ Aprobada
+
+---
 
 ## Historial de modificaciones
 
