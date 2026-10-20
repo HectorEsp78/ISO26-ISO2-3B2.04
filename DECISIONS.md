@@ -258,9 +258,101 @@ Permite distribuir el trabajo desde las primeras fases del proyecto y equilibrar
 
 ---
 
+## DEC-017: Finalización de requisitos antes de documentar casos de uso
+
+**Fecha:** 20/10/2026
+
+### Decisión
+La documentación detallada de los casos de uso comenzará únicamente cuando la especificación de requisitos esté completada y revisada.
+
+### Justificación
+Los casos de uso dependen directamente de los requisitos funcionales. Completar previamente los requisitos evitará inconsistencias y retrabajo.
+
+### Estado
+✅ Aprobada
+
+---
+
+## DEC-018: Gestión formal de restricciones del proyecto
+
+**Fecha:** 20/10/2026
+
+### Decisión
+Las restricciones del proyecto se registrarán mediante una incidencia específica dentro del repositorio.
+
+### Justificación
+Permite mantener trazabilidad, revisión y seguimiento de las restricciones identificadas durante el proyecto.
+
+### Estado
+✅ Aprobada
+
+---
+
+## DEC-019: Responsable del diagrama general de casos de uso
+
+**Fecha:** 20/10/2026
+
+### Decisión
+Se designa a **Héctor Espinosa Navarro** como responsable de elaborar el diagrama general de casos de uso.
+
+### Justificación
+Centralizar esta tarea favorece la coherencia entre actores, relaciones y casos de uso del sistema.
+
+### Estado
+✅ Aprobada
+
+---
+
+## DEC-020: Responsable de la priorización de casos de uso
+
+**Fecha:** 20/10/2026
+
+### Decisión
+Se designa a **Carla Dacuña Fernández** como responsable de realizar la priorización de los casos de uso.
+
+### Justificación
+La existencia de una única responsable facilita la aplicación homogénea de los criterios de prioridad establecidos por el equipo.
+
+### Estado
+✅ Aprobada
+
+---
+
+## DEC-021: Responsable de las tablas de planificación del PUD
+
+**Fecha:** 20/10/2026
+
+### Decisión
+Se designa a **Alberto Calvo de Mora Riballo** como responsable de elaborar las tablas de planificación requeridas para el Proceso Unificado de Desarrollo (PUD).
+
+### Justificación
+La planificación requiere una preparación específica basada en los casos de uso documentados y priorizados. Se acuerda asignar esta responsabilidad de forma explícita.
+
+### Estado
+✅ Aprobada
+
+---
+
+## DEC-022: Mantenimiento de la estructura documental de la Wiki
+
+**Fecha:** 20/10/2026
+
+### Decisión
+Se mantendrá actualizada la estructura de enlaces de la documentación de la wiki para garantizar la correcta navegación entre índices, reuniones y documentos relacionados.
+
+### Justificación
+Se detectaron errores en la navegación entre actas, lo que dificultaba el acceso a la documentación histórica del proyecto.
+
+### Estado
+✅ Aprobada
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
 |---------|---------|
 | 15/10/2026 | Creación inicial del documento de decisiones. |
+| 20/10/2026 | Incorporadas las decisiones DEC-017 a DEC-022 derivadas de la segunda reunión de seguimiento. |
+| 20/10/2026 | Actualizadas las decisiones DEC-009 y DEC-015 con información adicional sobre gestión documental y gestión de restricciones. |
 
