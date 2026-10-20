@@ -1,4 +1,3 @@
-# .github/workflows/maven.yml
 name: Build con Maven # nombre en la pestaña Actions
 on: # EVENTO: cuándo se ejecuta
 push:
