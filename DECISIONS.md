@@ -273,7 +273,7 @@ Permite compartir el proyecto sin que haya errores de compatibilidad entre los d
 
 ---
 
-## DEC-017: Finalización de requisitos antes de documentar casos de uso
+## DEC-018: Finalización de requisitos antes de documentar casos de uso
 
 **Fecha:** 20/10/2026
 
@@ -288,7 +288,7 @@ Los casos de uso dependen directamente de los requisitos funcionales. Completar 
 
 ---
 
-## DEC-018: Gestión formal de restricciones del proyecto
+## DEC-019: Gestión formal de restricciones del proyecto
 
 **Fecha:** 20/10/2026
 
@@ -303,7 +303,7 @@ Permite mantener trazabilidad, revisión y seguimiento de las restricciones iden
 
 ---
 
-## DEC-019: Responsable del diagrama general de casos de uso
+## DEC-020: Responsable del diagrama general de casos de uso
 
 **Fecha:** 20/10/2026
 
@@ -318,7 +318,7 @@ Centralizar esta tarea favorece la coherencia entre actores, relaciones y casos 
 
 ---
 
-## DEC-020: Responsable de la priorización de casos de uso
+## DEC-021: Responsable de la priorización de casos de uso
 
 **Fecha:** 20/10/2026
 
@@ -333,7 +333,7 @@ La existencia de una única responsable facilita la aplicación homogénea de lo
 
 ---
 
-## DEC-021: Responsable de las tablas de planificación del PUD
+## DEC-022: Responsable de las tablas de planificación del PUD
 
 **Fecha:** 20/10/2026
 
@@ -348,7 +348,7 @@ La planificación requiere una preparación específica basada en los casos de u
 
 ---
 
-## DEC-022: Mantenimiento de la estructura documental de la Wiki
+## DEC-023: Mantenimiento de la estructura documental de la Wiki
 
 **Fecha:** 20/10/2026
 
@@ -363,6 +363,118 @@ Se detectaron errores en la navegación entre actas, lo que dificultaba el acces
 
 ---
 
+### DEC-024: Prioridad de la documentación sobre la implementación
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+La finalización de toda la documentación correspondiente a la primera entrega tendrá prioridad sobre el inicio de las tareas de implementación del sistema.
+
+#### Justificación
+
+La documentación de planificación, requisitos, casos de uso, gestión de configuración, gestión de calidad y diagramas constituye el entregable principal de la primera evaluación y debe completarse antes de comenzar el desarrollo.
+
+#### Estado
+
+✅ Aprobada
+
+---
+
+### DEC-025: Contenido mínimo del documento de Gestión de Calidad
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+El documento de Gestión de Calidad deberá incluir:
+
+- Características de calidad relevantes para el sistema.
+- Requisitos de calidad identificados para el proyecto.
+- Criterios de evaluación y validación.
+- Aspectos relacionados con la calidad del producto.
+- Aspectos relacionados con la calidad del proceso.
+
+#### Justificación
+
+Se acordó unificar criterios sobre el contenido del documento tomando como referencia el material visto en las sesiones de teoría.
+
+#### Estado
+
+✅ Aprobada
+
+---
+
+### DEC-026: Sincronización obligatoria entre diagramas y documentación
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+Todos los diagramas del proyecto deberán mantenerse sincronizados con la documentación de requisitos y casos de uso vigente.
+
+#### Justificación
+
+Evita inconsistencias entre el modelo del sistema y la documentación funcional utilizada durante el desarrollo y las entregas.
+
+#### Estado
+
+✅ Aprobada
+
+---
+
+### DEC-027: Centralización de la documentación del proyecto
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+Se centralizará la elaboración y mantenimiento de la documentación con el fin de preservar la coherencia de formato, terminología y criterios de redacción.
+
+#### Justificación
+
+Una documentación homogénea facilita la revisión de las entregas y mejora la mantenibilidad de la información del proyecto.
+
+#### Estado
+
+✅ Aprobada
+
+---
+
+### DEC-028: Mantenimiento obligatorio del registro de decisiones
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+El archivo `DECISIONS.md` deberá actualizarse de forma continua para registrar todas aquellas decisiones que tengan impacto en la organización, desarrollo o documentación del proyecto.
+
+#### Justificación
+
+Permite mantener trazabilidad de las decisiones tomadas y facilita la incorporación de nuevos miembros o la revisión histórica del proyecto.
+
+#### Estado
+
+✅ Aprobada
+
+---
+
+### DEC-029: Posposición de la asignación definitiva de tareas de implementación
+
+**Fecha:** 10/11/2026
+
+#### Decisión
+
+La asignación definitiva de responsabilidades para la fase de implementación se realizará una vez completada y validada la documentación de la primera entrega.
+
+#### Justificación
+
+La organización del desarrollo depende de la versión final de requisitos, casos de uso y planificación, por lo que se considera prematuro fijar responsabilidades definitivas antes de finalizar dicha documentación.
+
+#### Estado
+
+✅ Aprobada
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -370,4 +482,6 @@ Se detectaron errores en la navegación entre actas, lo que dificultaba el acces
 | 15/10/2026 | Creación inicial del documento de decisiones. |
 | 20/10/2026 | Incorporadas las decisiones DEC-017 a DEC-022 derivadas de la segunda reunión de seguimiento. |
 | 20/10/2026 | Actualizadas las decisiones DEC-009 y DEC-015 con información adicional sobre gestión documental y gestión de restricciones. |
+| 10/11/2026 | Corregida la numeración de decisiones a partir de la duplicidad detectada en DEC-017. |
+| 10/11/2026 | Incorporadas las decisiones DEC-024 a DEC-029 derivadas de la cuarta reunión de seguimiento. |
 
