@@ -524,11 +524,13 @@ Facilita la configuración del entorno de desarrollo y asegura que todos los int
 
 ### Decisión
 
-La implementación del sistema comenzará por los casos de uso priorizados para la primera versión funcional.
+La implementación comenzará por **CU12 Gestionar pacientes** (RF12), en la iteración 1 de la fase de Elaboración, siguiendo el orden de iteraciones del Plan de Desarrollo (PUD). El trabajo se divide en dos sub-issues, una para el servidor y otra para el cliente, desarrolladas en las ramas `feature/CU12-servidor` y `feature/CU12-cliente`.
+
+Los siguientes casos de uso se abordarán en el orden fijado por el PUD, una iteración por caso de uso.
 
 ### Justificación
 
-Permite obtener una primera versión operativa del sistema centrada en las funcionalidades de mayor valor y prioridad para el proyecto.
+CU12 es la base de los demás casos de uso: sin pacientes registrados no se pueden gestionar citas, solicitudes de pruebas ni informes. Empezar por él permite validar pronto la arquitectura cliente-servidor, la comunicación por sockets y la conexión con MySQL.
 
 ### Estado
 
@@ -544,13 +546,15 @@ Permite obtener una primera versión operativa del sistema centrada en las funci
 
 Todo desarrollo deberá seguir el siguiente flujo de trabajo:
 
-1. Crear una incidencia principal para el caso de uso asignado.
-2. Crear subincidencias para las tareas derivadas.
-3. Crear una rama específica asociada a la incidencia.
-4. Implementar la funcionalidad en dicha rama.
-5. Realizar pruebas y verificaciones.
-6. Abrir una Pull Request.
-7. Integrar los cambios en la rama principal tras su revisión.
+1. Crear una issue principal para el caso de uso con la plantilla «Caso de uso», con sus criterios de aceptación y horas estimadas, y asignarla al milestone de la iteración.
+2. Crear dos sub-issues, una para el servidor y otra para el cliente, cada una con su responsable.
+3. Crear la rama de cada sub-issue a partir de `develop`, con el nombre `feature/CUxx-servidor` o `feature/CUxx-cliente`.
+4. Implementar la funcionalidad en esa rama, con commits según Conventional Commits que referencien la issue (`#n`).
+5. Diseñar y ejecutar las pruebas unitarias y comprobar que `mvn verify` pasa en local con una cobertura de ramas de al menos el 75 %.
+6. Abrir una pull request hacia `develop` con la plantilla del repositorio, enlazando la issue con `Closes #n`.
+7. Integrar en `develop` cuando la PR tenga al menos una aprobación y el check `build` esté en verde, mediante *merge commit* y sin borrar la rama.
+
+Solo las ramas `release/*` y `hotfix/*` se integran en `main`.
 
 ### Justificación
 
@@ -568,7 +572,15 @@ Garantiza la trazabilidad del trabajo realizado, facilita la revisión de cambio
 
 ### Decisión
 
-Antes de iniciar cualquier nueva tarea o desarrollo, cada integrante deberá sincronizar su repositorio local con la rama principal del proyecto.
+Antes de iniciar cualquier nueva tarea, cada integrante deberá actualizar su rama `develop` local y crear la nueva rama a partir de ella:
+
+```bash
+git switch develop
+git pull origin develop
+git switch -c feature/CUxx-modulo
+```
+
+Si `develop` avanza mientras se trabaja en una rama, se incorporarán sus cambios con `git pull origin develop` desde la propia rama antes de abrir la pull request.
 
 ### Justificación
 
@@ -650,6 +662,35 @@ Permite validar tempranamente la arquitectura seleccionada, detectar problemas d
 
 ✅ Aprobada
 
+---
+
+## DEC-039: Comunicación cliente-servidor mediante sockets
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+El cliente y el servidor se comunicarán mediante **sockets TCP** (`java.net.Socket` y `java.net.ServerSocket`), con un protocolo de texto propio:
+
+- Cada mensaje ocupa una línea codificada en UTF-8.
+- Una petición tiene la forma `OPERACION;argumento1;argumento2;...`.
+- Una respuesta empieza por `OK` o `ERROR`, seguida de sus datos separados por `;`.
+- El servidor atiende a cada cliente en un hilo independiente.
+
+La operación `PING` (respuesta `OK;PONG`) se usa para comprobar la conexión. Cada caso de uso añadirá sus propias operaciones.
+
+### Alternativas consideradas
+
+Una API REST sencilla. Se descarta porque añadiría un servidor HTTP y una librería JSON sin aportar nada a los objetivos de la asignatura.
+
+### Justificación
+
+Los sockets no necesitan dependencias externas, dejan clara la separación entre cliente y servidor que pide la profesora y el protocolo de texto es fácil de probar con JUnit.
+
+### Estado
+
+✅ Aprobada
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -660,4 +701,5 @@ Permite validar tempranamente la arquitectura seleccionada, detectar problemas d
 | 10/11/2026 | Corregida la numeración de decisiones a partir de la duplicidad detectada en DEC-017. |
 | 10/11/2026 | Incorporadas las decisiones DEC-024 a DEC-029 derivadas de la cuarta reunión de seguimiento. |
 | 17/11/2026 | Incorporadas las decisiones DEC-030 a DEC-038 derivadas de la planificación de la fase de implementación y revisión documental. |
+| 17/11/2026 | Concretadas DEC-032, DEC-033 y DEC-034. Incorporada la decisión DEC-039 sobre comunicación por sockets. |
 
