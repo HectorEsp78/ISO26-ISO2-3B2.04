@@ -24,3 +24,11 @@ hs_err_pid*
 replay_pid*
 
 target/
+
+# Ficheros temporales de editores de documentos
+# LibreOffice (bloqueo mientras el documento está abierto)
+.~lock.*#
+# Microsoft Office
+~$*
+# Sistemas de ficheros FUSE (ficheros borrados que siguen abiertos)
+.fuse_hidden*
