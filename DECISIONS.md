@@ -475,6 +475,222 @@ La organización del desarrollo depende de la versión final de requisitos, caso
 
 ✅ Aprobada
 
+---
+
+## DEC-030: Tecnologías base de la arquitectura del sistema
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Se establece la siguiente pila tecnológica para el desarrollo del sistema:
+
+- JavaFX para la interfaz de usuario.
+- MySQL como sistema gestor de bases de datos.
+- Maven para la gestión del proyecto y sus dependencias.
+- Arquitectura cliente-servidor.
+
+### Justificación
+
+Estas tecnologías forman parte de los requisitos y directrices establecidos para el desarrollo del proyecto y permiten una integración adecuada con la arquitectura definida.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-031: Inclusión del script de inicialización de base de datos
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+El repositorio deberá incluir un script SQL destinado a la creación de la base de datos y a la carga de los datos iniciales necesarios para la ejecución del sistema.
+
+### Justificación
+
+Facilita la configuración del entorno de desarrollo y asegura que todos los integrantes trabajen sobre una estructura de datos común y reproducible.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-032: Estrategia de inicio de la implementación
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+La implementación comenzará por **CU12 Gestionar pacientes** (RF12), en la iteración 1 de la fase de Elaboración, siguiendo el orden de iteraciones del Plan de Desarrollo (PUD). El trabajo se divide en dos sub-issues, una para el servidor y otra para el cliente, desarrolladas en las ramas `feature/CU12-servidor` y `feature/CU12-cliente`.
+
+Los siguientes casos de uso se abordarán en el orden fijado por el PUD, una iteración por caso de uso.
+
+### Justificación
+
+CU12 es la base de los demás casos de uso: sin pacientes registrados no se pueden gestionar citas, solicitudes de pruebas ni informes. Empezar por él permite validar pronto la arquitectura cliente-servidor, la comunicación por sockets y la conexión con MySQL.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-033: Flujo de trabajo de desarrollo basado en incidencias
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Todo desarrollo deberá seguir el siguiente flujo de trabajo:
+
+1. Crear una issue principal para el caso de uso con la plantilla «Caso de uso», con sus criterios de aceptación y horas estimadas, y asignarla al milestone de la iteración.
+2. Crear dos sub-issues, una para el servidor y otra para el cliente, cada una con su responsable.
+3. Crear la rama de cada sub-issue a partir de `develop`, con el nombre `feature/CUxx-servidor` o `feature/CUxx-cliente`.
+4. Implementar la funcionalidad en esa rama, con commits según Conventional Commits que referencien la issue (`#n`).
+5. Diseñar y ejecutar las pruebas unitarias y comprobar que `mvn verify` pasa en local con una cobertura de ramas de al menos el 75 %.
+6. Abrir una pull request hacia `develop` con la plantilla del repositorio, enlazando la issue con `Closes #n`.
+7. Integrar en `develop` cuando la PR tenga al menos una aprobación y el check `build` esté en verde, mediante *merge commit* y sin borrar la rama.
+
+Solo las ramas `release/*` y `hotfix/*` se integran en `main`.
+
+### Justificación
+
+Garantiza la trazabilidad del trabajo realizado, facilita la revisión de cambios y reduce los riesgos de integración.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-034: Sincronización del repositorio local antes de comenzar nuevas tareas
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Antes de iniciar cualquier nueva tarea, cada integrante deberá actualizar su rama `develop` local y crear la nueva rama a partir de ella:
+
+```bash
+git switch develop
+git pull origin develop
+git switch -c feature/CUxx-modulo
+```
+
+Si `develop` avanza mientras se trabaja en una rama, se incorporarán sus cambios con `git pull origin develop` desde la propia rama antes de abrir la pull request.
+
+### Justificación
+
+Minimiza conflictos de integración y asegura que todo el equipo trabaje sobre la versión más reciente del código y la documentación.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-035: Creación de una estructura de pruebas asociada a los casos de uso
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Se definirá una estructura específica para almacenar los casos de prueba asociados a cada caso de uso del sistema.
+
+### Justificación
+
+Permite organizar la validación funcional del proyecto y mantener la trazabilidad entre requisitos, casos de uso e implementación.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-036: Conservación de prompts utilizados en desarrollo asistido por IA
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Los prompts utilizados durante el desarrollo asistido por herramientas de inteligencia artificial deberán conservarse y vincularse a los casos de uso correspondientes cuando resulte necesario para la documentación del proyecto.
+
+### Justificación
+
+Facilita la trazabilidad del desarrollo asistido por IA y permite justificar la generación de determinados artefactos o soluciones.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-037: Uso de documentación editable durante la fase de trabajo
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+Durante la elaboración de documentación extensa, el equipo utilizará documentos editables compartidos para el trabajo colaborativo, incorporando posteriormente la versión consolidada al repositorio oficial del proyecto.
+
+### Justificación
+
+Facilita la edición simultánea por varios miembros del equipo y simplifica la consolidación de cambios antes de su publicación definitiva.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-038: Coordinación de la primera versión funcional
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+La planificación de desarrollo del equipo se orientará a disponer de una primera versión funcional del sistema antes de ampliar funcionalidades secundarias.
+
+### Justificación
+
+Permite validar tempranamente la arquitectura seleccionada, detectar problemas de integración y servir como base para iteraciones posteriores.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-039: Comunicación cliente-servidor mediante sockets
+
+**Fecha:** 17/11/2026
+
+### Decisión
+
+El cliente y el servidor se comunicarán mediante **sockets TCP** (`java.net.Socket` y `java.net.ServerSocket`), con un protocolo de texto propio:
+
+- Cada mensaje ocupa una línea codificada en UTF-8.
+- Una petición tiene la forma `OPERACION;argumento1;argumento2;...`.
+- Una respuesta empieza por `OK` o `ERROR`, seguida de sus datos separados por `;`.
+- El servidor atiende a cada cliente en un hilo independiente.
+
+La operación `PING` (respuesta `OK;PONG`) se usa para comprobar la conexión. Cada caso de uso añadirá sus propias operaciones.
+
+### Alternativas consideradas
+
+Una API REST sencilla. Se descarta porque añadiría un servidor HTTP y una librería JSON sin aportar nada a los objetivos de la asignatura.
+
+### Justificación
+
+Los sockets no necesitan dependencias externas, dejan clara la separación entre cliente y servidor que pide la profesora y el protocolo de texto es fácil de probar con JUnit.
+
+### Estado
+
+✅ Aprobada
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -484,4 +700,6 @@ La organización del desarrollo depende de la versión final de requisitos, caso
 | 20/10/2026 | Actualizadas las decisiones DEC-009 y DEC-015 con información adicional sobre gestión documental y gestión de restricciones. |
 | 10/11/2026 | Corregida la numeración de decisiones a partir de la duplicidad detectada en DEC-017. |
 | 10/11/2026 | Incorporadas las decisiones DEC-024 a DEC-029 derivadas de la cuarta reunión de seguimiento. |
+| 17/11/2026 | Incorporadas las decisiones DEC-030 a DEC-038 derivadas de la planificación de la fase de implementación y revisión documental. |
+| 17/11/2026 | Concretadas DEC-032, DEC-033 y DEC-034. Incorporada la decisión DEC-039 sobre comunicación por sockets. |
 
