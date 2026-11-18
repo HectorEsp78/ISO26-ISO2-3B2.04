@@ -8,7 +8,7 @@
 
     <name>radiodiagnostico</name>
 
-    <url>https://example.org/radiodiagnostico</url>
+    <url>https://github.com/HectorEsp78/ISO26-ISO2-3B2.04</url>
 
     <distributionManagement>
         <site>
@@ -24,7 +24,7 @@
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
-        <project.build.sourceEncoding>UTF8</project.build.sourceEncoding>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencyManagement>
