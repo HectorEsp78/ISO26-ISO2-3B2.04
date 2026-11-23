@@ -691,6 +691,144 @@ Los sockets no necesitan dependencias externas, dejan clara la separación entre
 
 ✅ Aprobada
 
+---
+
+## DEC-042: Estados de la cita
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+En CU13 la cita tendrá dos estados: `PROGRAMADA` y `CANCELADA`. El estado `REALIZADA` lo incorporará CU10 (Registrar realización de prueba).
+
+### Justificación
+
+Limita el modelo a lo que cubre RF13 y evita sobreingeniería. Los estados posteriores se añadirán cuando su caso de uso los necesite.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-043: Criterio de solape de citas
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+No se admiten dos citas `PROGRAMADA` solapadas en el mismo recurso (sala o equipo) ni para el mismo paciente. Dos citas se solapan si el inicio de cada una es anterior al fin de la otra; si una termina justo cuando empieza la otra, no se solapan.
+
+La comprobación se realiza en el servidor y debe ser atómica, de forma que dos peticiones simultáneas no puedan crear citas solapadas.
+
+### Justificación
+
+Evita las dobles reservas, que es el principal riesgo de la iteración 2 según el PUD.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-044: Horario de citación provisional
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+Hasta que existan las agendas de los médicos (CU14), las citas deberán empezar y terminar de lunes a viernes entre las 08:00 y las 20:00.
+
+### Alternativas consideradas
+
+No comprobar el horario. Se descarta porque permitiría citas a cualquier hora del día.
+
+### Justificación
+
+CU13 se desarrolla antes que CU14 y necesita una regla temporal. Se sustituirá por las agendas en la iteración 10.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-045: Reprogramar modifica la misma cita
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+La reprogramación actualiza la fecha, la hora o el recurso de la cita existente y conserva su identificador. No crea una cita nueva ni guarda un historial de reprogramaciones.
+
+### Justificación
+
+Simplicidad y trazabilidad de la cita. RF13 no exige historial de cambios y se podrá añadir más adelante si hace falta.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-046: Cancelación lógica con motivo obligatorio
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+Cancelar una cita la deja en estado `CANCELADA` con un motivo obligatorio (máximo 255 caracteres). La cita no se borra y su hueco queda libre.
+
+### Justificación
+
+Conserva el histórico para la auditoría (CU19), los informes de cancelaciones y las estadísticas posteriores. Es coherente con la baja lógica de pacientes de CU12.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-047: Catálogo de pruebas y recursos de ejemplo
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+Hasta que el administrador pueda configurar los tipos de prueba y los recursos, CU13 usará una lista de ejemplo (tipo de prueba con su duración estimada, y recursos) cargada en el script SQL inicial (DEC-031).
+
+### Justificación
+
+La configuración del sistema llega en una iteración posterior y CU13 necesita esos datos para asignar citas.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-048: Citas pendientes de un paciente dado de baja
+
+**Fecha:** 23/11/2026
+
+### Decisión
+
+Al dar de baja a un paciente, sus citas `PROGRAMADA` pasarán a `CANCELADA` con el motivo «Baja del paciente», en lugar de eliminarse. Esta decisión sustituye a RN-04 y FA-07 de la especificación de CU12, que deberán actualizarse.
+
+### Alternativas consideradas
+
+Eliminar las citas pendientes, como indica RN-04 de CU12. Se descarta porque borra datos que la auditoría y los informes necesitan y contradice la cancelación lógica de DEC-046.
+
+### Justificación
+
+Mantiene una única forma de tratar las citas y conserva el histórico que necesitan la auditoría (CU19) y los informes. Es coherente con DEC-046.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con el responsable de CU12)
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -702,4 +840,5 @@ Los sockets no necesitan dependencias externas, dejan clara la separación entre
 | 10/11/2026 | Incorporadas las decisiones DEC-024 a DEC-029 derivadas de la cuarta reunión de seguimiento. |
 | 17/11/2026 | Incorporadas las decisiones DEC-030 a DEC-038 derivadas de la planificación de la fase de implementación y revisión documental. |
 | 17/11/2026 | Concretadas DEC-032, DEC-033 y DEC-034. Incorporada la decisión DEC-039 sobre comunicación por sockets. |
+| 23/11/2026 | Incorporadas las decisiones DEC-042 a DEC-048 derivadas de la especificación de CU13 (pendientes de aprobación). |
 
