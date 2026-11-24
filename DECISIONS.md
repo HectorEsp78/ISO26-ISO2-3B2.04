@@ -829,6 +829,113 @@ Mantiene una única forma de tratar las citas y conserva el histórico que neces
 
 ---
 
+## DEC-049: Asignación individual y completa de casos de uso por integrante
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+Se modifica la organización del trabajo por fases (sustituyendo el reparto anterior de DEC-016) para que cada integrante desarrolle de forma individual e íntegra **4 casos de uso** (uno de cada uno de los cuatro niveles de prioridad, sumando los 24 casos de uso del sistema). Asimismo, cada miembro será responsable de abrir sus propias incidencias (*issues*) y *Pull Requests* asociadas a sus casos de uso.
+
+### Justificación
+
+Evita dependencias y tiempos de espera entre los miembros del equipo al avanzar entre fases, permitiendo trabajar en paralelo desde el inicio y reflejando de forma clara e individual la contribución de cada integrante en el repositorio.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-050: Actualización del Plan de Desarrollo (PUD) mediante anexo o nueva versión
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+Se conservará la planificación original del PUD en la wiki sin eliminarla y se incorporará una nueva versión o anexo justificando la reorganización del trabajo e indicando en las tablas el responsable individual asignado a cada caso de uso.
+
+### Justificación
+
+Permite mantener la trazabilidad respecto a la planificación inicial entregada y documentar formalmente los ajustes realizados por motivos de calendario y coordinación del equipo.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-051: Omisión de diagramas individuales en la fase de análisis
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+En la fase de análisis no se elaborarán diagramas UML individuales para cada caso de uso, utilizándose únicamente los diagramas generales del sistema ya definidos.
+
+### Justificación
+
+Siguiendo las indicaciones de la profesora, los diagramas generales son suficientes para el alcance del proyecto y evitar diagramas redundantes por caso de uso agiliza el avance hacia la fase de implementación.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-052: Validación mediante pruebas cruzadas entre integrantes
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+El diseño y la ejecución de las pruebas de cada caso de uso se realizarán de forma cruzada por un integrante distinto al responsable de su implementación.
+
+### Justificación
+
+Aumenta la objetividad en la verificación funcional, facilita la detección temprana de errores que el propio desarrollador podría pasar por alto y asegura una revisión mutua del código.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-053: Estandarización mediante uso de un prompt común
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+El equipo acordará y utilizará un *prompt* base común durante el desarrollo asistido por inteligencia artificial para la generación de artefactos e implementación.
+
+### Justificación
+
+Garantiza homogeneidad en la estructura, estilo de código y documentación generada por todos los miembros del equipo.
+
+### Estado
+
+✅ Aprobada
+
+---
+
+## DEC-054: Organización en parejas rotativas para el trabajo teórico
+
+**Fecha:** 24/11/2026
+
+### Decisión
+
+Para el segundo trabajo de la parte teórica (3 problemas), el equipo de 6 integrantes se dividirá en **3 parejas** que trabajarán de forma rotativa en cada paso de los problemas, aplicando el mismo flujo de trabajo con repositorio e incidencias utilizado en las prácticas.
+
+### Justificación
+
+Permite distribuir equitativamente la carga de trabajo entre todos los miembros del grupo y asegura que todas las parejas participen en la resolución de los distintos problemas antes de la entrega del 15 de diciembre.
+
+### Estado
+
+✅ Aprobada
+
+---
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -841,4 +948,4 @@ Mantiene una única forma de tratar las citas y conserva el histórico que neces
 | 17/11/2026 | Incorporadas las decisiones DEC-030 a DEC-038 derivadas de la planificación de la fase de implementación y revisión documental. |
 | 17/11/2026 | Concretadas DEC-032, DEC-033 y DEC-034. Incorporada la decisión DEC-039 sobre comunicación por sockets. |
 | 23/11/2026 | Incorporadas las decisiones DEC-042 a DEC-048 derivadas de la especificación de CU13 (pendientes de aprobación). |
-
+| 24/11/2026 | Incorporadas las decisiones DEC-049 a DEC-054 derivadas de la sexta reunión de seguimiento (reparto individual de casos de uso, actualización del PUD, alcance de análisis, pruebas cruzadas y trabajo teórico). |
