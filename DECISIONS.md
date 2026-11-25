@@ -936,6 +936,159 @@ Permite distribuir equitativamente la carga de trabajo entre todos los miembros 
 ✅ Aprobada
 
 ---
+## DEC-055: Datos del paciente y sus validaciones
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se concretan los formatos del apartado 8 de la especificación de CU12. Antes de validar se eliminan los espacios del principio y del final de cada campo, y el DNI/NIE y la tarjeta sanitaria se pasan a mayúsculas.
+
+| Campo | Obligatorio | Único | Validación |
+|---|---|---|---|
+| DNI / NIE | Sí | Sí | DNI: 8 dígitos y letra de control. NIE: X, Y o Z, 7 dígitos y letra de control (X=0, Y=1, Z=2). La letra es la de la posición *número mod 23* en `TRWAGMYFPDXBNJZSQVHLCKE`. |
+| Tarjeta sanitaria | Sí | Sí | Código CIP del SNS: exactamente 16 caracteres, letras mayúsculas o dígitos. |
+| Nombre | Sí | No | Entre 1 y 50 caracteres. Letras (incluidas tildes y ñ), espacios, guion y apóstrofo. |
+| Apellidos | Sí | No | Entre 1 y 100 caracteres, con los mismos caracteres que el nombre. |
+| Fecha de nacimiento | No | No | Fecha válida, no posterior a hoy y no anterior al 01/01/1900. |
+| Sexo | No | No | `HOMBRE` o `MUJER`. |
+| Teléfono | Sí | No | 9 dígitos y el primero es 6, 7, 8 o 9. |
+| Correo electrónico | No | No | Como máximo 100 caracteres, con el formato `usuario@dominio.ext`. |
+| Dirección | No | No | Como máximo 200 caracteres. |
+| Estado | Sí | No | `ACTIVO` o `BAJA`. Lo asigna el sistema: el alta crea el paciente `ACTIVO` y la baja lo pasa a `BAJA`. |
+
+Las validaciones las aplican tanto el cliente como el servidor con la misma clase (`ValidadorPaciente`, del módulo `comun`, DEC-058). El servidor vuelve a validar todo lo que recibe, aunque el cliente ya lo haya hecho.
+
+### Justificación
+
+La especificación dejaba estos formatos sin concretar y sin ellos no se pueden programar las validaciones ni diseñar los casos de prueba (clases de equivalencia y valores límite).
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-056: Búsqueda de pacientes solo por DNI en la iteración 1
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+En la iteración 1 la búsqueda de pacientes (flujo 6.2 de CU12) se hace únicamente por DNI/NIE y devuelve como mucho un paciente. La búsqueda por nombre o por tarjeta sanitaria se aplaza a una iteración posterior.
+
+### Justificación
+
+Los criterios de aceptación de CU12 solo exigen la búsqueda por DNI (CA-01 y CA-05). Limitar el alcance permite terminar la iteración en el plazo previsto.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-057: Operaciones del protocolo de sockets para CU12
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039 con estas operaciones:
+
+| Petición | Respuesta correcta | Errores posibles |
+|---|---|---|
+| `ALTA_PACIENTE;<datos>` | `OK;<paciente>` | `CAMPO_OBLIGATORIO`, `CAMPO_NO_VALIDO`, `DNI_DUPLICADO`, `TARJETA_DUPLICADA` |
+| `BUSCAR_PACIENTE;<dni>` | `OK;<paciente>` | `CAMPO_OBLIGATORIO`, `CAMPO_NO_VALIDO`, `PACIENTE_NO_ENCONTRADO` |
+| `MODIFICAR_PACIENTE;<datos>` | `OK;<paciente>` | los del alta (salvo `DNI_DUPLICADO`), `PACIENTE_NO_ENCONTRADO`, `PACIENTE_DE_BAJA` |
+| `BAJA_PACIENTE;<dni>` | `OK;<paciente>` | `CAMPO_OBLIGATORIO`, `CAMPO_NO_VALIDO`, `PACIENTE_NO_ENCONTRADO`, `PACIENTE_DE_BAJA` |
+
+- `<datos>` son 9 campos en este orden: `dni;tarjetaSanitaria;nombre;apellidos;fechaNacimiento;sexo;telefono;correo;direccion`.
+- `<paciente>` son esos 9 campos seguidos de `estado`.
+- Un campo opcional vacío se envía como cadena vacía. La fecha va en formato ISO (`aaaa-mm-dd`).
+- En `MODIFICAR_PACIENTE` el DNI identifica al paciente y no se puede cambiar (RN-03).
+- Una respuesta de error tiene la forma `ERROR;<código>` o `ERROR;<código>;<campo>`. Los errores `CAMPO_OBLIGATORIO` y `CAMPO_NO_VALIDO` indican en `<campo>` el nombre del campo tal y como aparece arriba (por ejemplo `ERROR;CAMPO_OBLIGATORIO;telefono`), de modo que el cliente pueda señalar qué campo falla (CA-02).
+- Códigos generales: `PETICION_NO_VALIDA` (operación desconocida o número de campos incorrecto) y `ERROR_INTERNO` (fallo del servidor, por ejemplo de la base de datos).
+- Carácter de escape: dentro de un campo, `\` se envía como `\\`, `;` como `\;`, el salto de línea como `\n` y el retorno de carro como `\r`.
+- El servidor escucha por defecto en el puerto **5050**. El cliente abre una conexión por petición y espera la respuesta como máximo 5 segundos. El host y el puerto se pueden configurar.
+
+### Justificación
+
+El cliente y el servidor se desarrollan por separado y necesitan un contrato cerrado. Los códigos de error permiten al cliente mostrar mensajes claros sin interpretar textos libres, y el escape evita que un `;` en la dirección rompa el mensaje.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-058: Módulo Maven `comun` compartido por cliente y servidor
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se añade al proyecto padre de la DEC-017 un tercer módulo, `comun` (`es.uclm.esi.iso2:comun`), del que dependen el cliente y el servidor. Contiene únicamente código sin dependencias externas que deben compartir los dos:
+
+- Las entidades de dominio que viajan por el protocolo (`Paciente`, `EstadoPaciente`).
+- Las validaciones de los datos (`ValidadorPaciente`).
+- La codificación del protocolo: nombres de las operaciones, códigos de error y escape de campos (`Protocolo`, `CodigoError`).
+
+### Alternativas consideradas
+
+Duplicar estas clases en el cliente y en el servidor. Se descarta porque obliga a mantener dos copias que acabarían siendo distintas, y precisamente el protocolo y las validaciones tienen que coincidir en los dos extremos.
+
+### Justificación
+
+Garantiza que el cliente y el servidor validan igual y hablan el mismo protocolo, y permite probar ese código una sola vez.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-059: Estructura del cliente JavaFX
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+- El cliente usa **JavaFX 21** (21.0.13, versión LTS compatible con el Java 21 del proyecto y de la CI) con vistas FXML, y se ejecuta con `javafx-maven-plugin`.
+- La pantalla y los formularios (paquete `es.uclm.esi.iso2.cliente.presentacion`) solo muestran datos y recogen lo que introduce el usuario. La lógica va en clases sin JavaFX: `GestorPacientesCliente` (validación previa y mensajes) y el servicio de pacientes.
+- El acceso al servidor se hace a través de la interfaz `ServicioPacientes`, con dos implementaciones:
+  - `ServicioPacientesSocket`: la real, por sockets (DEC-039 y DEC-057).
+  - `ServicioPacientesEnMemoria`: aplica las mismas reglas que el servidor sin red ni base de datos. Se usa en las pruebas y para probar la interfaz sin servidor (`-Dradiodiagnostico.modo=memoria`).
+- Mientras no exista CU23 (Autenticarse), el cliente arranca directamente en la pantalla de pacientes.
+
+### Justificación
+
+Permite desarrollar y probar el cliente antes de que el servidor esté terminado, y deja la lógica en clases que se pueden probar con JUnit sin interfaz gráfica.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-060: Cobertura de ramas obligatoria y exclusión de la capa de presentación
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+- La regla de JaCoCo del proyecto padre mide la cobertura de **ramas** (`BRANCH`) con un mínimo del 75 %, como exige la DEC-033, en lugar de la cobertura de líneas.
+- La comprobación pasa a ser bloqueante (`haltOnFailure` a `true`): `mvn verify`, y por tanto el check `build`, falla si un módulo no llega al mínimo.
+- En el cliente se excluye del cálculo el paquete `presentacion` (controladores y vistas JavaFX), que no se puede probar con JUnit sin interfaz gráfica. Por eso esas clases no deben contener lógica (DEC-059).
+
+### Justificación
+
+Alinea la configuración con la Definition of Done y evita que se integre código sin el nivel de pruebas acordado, sin penalizar el código de interfaz, que se verifica manualmente.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -949,3 +1102,4 @@ Permite distribuir equitativamente la carga de trabajo entre todos los miembros 
 | 17/11/2026 | Concretadas DEC-032, DEC-033 y DEC-034. Incorporada la decisión DEC-039 sobre comunicación por sockets. |
 | 23/11/2026 | Incorporadas las decisiones DEC-042 a DEC-048 derivadas de la especificación de CU13 (pendientes de aprobación). |
 | 24/11/2026 | Incorporadas las decisiones DEC-049 a DEC-054 derivadas de la sexta reunión de seguimiento (reparto individual de casos de uso, actualización del PUD, alcance de análisis, pruebas cruzadas y trabajo teórico). |
+| 25/11/2026 | Incorporadas las decisiones DEC-055 a DEC-060 derivadas del diseño de CU12 (datos del paciente, búsqueda por DNI, protocolo, módulo comun, estructura del cliente y cobertura), pendientes de aprobación. |
