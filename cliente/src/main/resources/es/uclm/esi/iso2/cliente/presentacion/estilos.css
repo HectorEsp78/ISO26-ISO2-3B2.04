@@ -1,0 +1,90 @@
+/* Estilos del cliente de radiodiagnóstico */
+
+.raiz {
+    -fx-font-size: 14px;
+    -fx-background-color: #f6f7f9;
+}
+
+.cabecera {
+    -fx-padding: 16 20 14 20;
+    -fx-background-color: white;
+    -fx-border-color: transparent transparent #dde1e6 transparent;
+}
+
+.titulo {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1f2d3d;
+}
+
+.nota, .marcador {
+    -fx-text-fill: #5f6b7a;
+}
+
+.ficha {
+    -fx-background-color: white;
+    -fx-padding: 18;
+    -fx-background-radius: 6;
+    -fx-border-color: #dde1e6;
+    -fx-border-radius: 6;
+}
+
+.nombre-paciente {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+}
+
+.etiqueta {
+    -fx-text-fill: #5f6b7a;
+}
+
+.estado {
+    -fx-padding: 2 10 2 10;
+    -fx-background-radius: 10;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.estado-activo {
+    -fx-background-color: #e3f4e8;
+    -fx-text-fill: #1e7b3c;
+}
+
+.estado-baja {
+    -fx-background-color: #fde8e8;
+    -fx-text-fill: #b42318;
+}
+
+.boton-principal {
+    -fx-base: #1f6feb;
+    -fx-text-fill: white;
+}
+
+.boton-peligro {
+    -fx-text-fill: #b42318;
+}
+
+.campo-error {
+    -fx-border-color: #d92d20;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 3;
+}
+
+.barra-mensaje {
+    -fx-padding: 8 20 8 20;
+    -fx-min-height: 36;
+    -fx-background-color: white;
+    -fx-border-color: #dde1e6 transparent transparent transparent;
+}
+
+.mensaje-ok {
+    -fx-text-fill: #1e7b3c;
+}
+
+.mensaje-error {
+    -fx-text-fill: #b42318;
+}
+
+.mensaje-info {
+    -fx-text-fill: #5f6b7a;
+}

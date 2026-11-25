@@ -10,11 +10,62 @@
     <artifactId>cliente</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
+    <properties>
+        <!-- Servicio que usa el cliente al arrancar: socket (servidor real) o memoria (sin servidor). DEC-059 -->
+        <radiodiagnostico.modo>socket</radiodiagnostico.modo>
+        <radiodiagnostico.host>localhost</radiodiagnostico.host>
+        <radiodiagnostico.puerto>5050</radiodiagnostico.puerto>
+    </properties>
+
     <dependencies>
+        <dependency>
+            <groupId>es.uclm.esi.iso2</groupId>
+            <artifactId>comun</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+
+            <!-- mvn javafx:run (desde la carpeta cliente) -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>es.uclm.esi.iso2.cliente.presentacion.Principal</mainClass>
+                    <options>
+                        <option>-Dradiodiagnostico.modo=${radiodiagnostico.modo}</option>
+                        <option>-Dradiodiagnostico.host=${radiodiagnostico.host}</option>
+                        <option>-Dradiodiagnostico.puerto=${radiodiagnostico.puerto}</option>
+                    </options>
+                </configuration>
+            </plugin>
+
+            <!-- La capa de presentación JavaFX no cuenta para la cobertura (DEC-060) -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>es/uclm/esi/iso2/cliente/presentacion/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
 </project>
