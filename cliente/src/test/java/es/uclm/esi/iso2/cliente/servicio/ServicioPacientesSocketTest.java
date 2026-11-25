@@ -101,6 +101,34 @@ class ServicioPacientesSocketTest {
     }
 
     @Test
+    void comprobarPacienteActivo() throws Exception {
+        ServicioPacientesSocket servicio = servicioQueResponde("OK;ACTIVO");
+        assertEquals(EstadoPaciente.ACTIVO, servicio.comprobar("12345678Z"));
+        assertEquals("COMPROBAR_PACIENTE;12345678Z", peticion());
+    }
+
+    @Test
+    void comprobarPacienteNoEncontrado() throws Exception {
+        ServicioPacientesSocket servicio = servicioQueResponde("ERROR;PACIENTE_NO_ENCONTRADO");
+        assertError(CodigoError.PACIENTE_NO_ENCONTRADO, null,
+                assertThrows(ExcepcionServicio.class, () -> servicio.comprobar("12345678Z")));
+    }
+
+    @Test
+    void comprobarConEstadoDesconocido() throws Exception {
+        ServicioPacientesSocket servicio = servicioQueResponde("OK;JUBILADO");
+        assertError(CodigoError.RESPUESTA_NO_VALIDA, null,
+                assertThrows(ExcepcionServicio.class, () -> servicio.comprobar("12345678Z")));
+    }
+
+    @Test
+    void estaActivoSinConexionLanzaElError() throws Exception {
+        ServicioPacientesSocket servicio = servicioQueResponde(null);
+        assertError(CodigoError.SIN_CONEXION, null,
+                assertThrows(ExcepcionServicio.class, () -> servicio.estaActivo("12345678Z")));
+    }
+
+    @Test
     void errorConCampo() throws Exception {
         ServicioPacientesSocket servicio = servicioQueResponde("ERROR;CAMPO_OBLIGATORIO;telefono");
         assertError(CodigoError.CAMPO_OBLIGATORIO, CampoPaciente.TELEFONO,

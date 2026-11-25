@@ -23,6 +23,8 @@ public final class Protocolo {
     public static final String BUSCAR_PACIENTE = "BUSCAR_PACIENTE";
     public static final String MODIFICAR_PACIENTE = "MODIFICAR_PACIENTE";
     public static final String BAJA_PACIENTE = "BAJA_PACIENTE";
+    /** Comprueba si un paciente existe y en qué estado está, sin enviar sus datos (DEC-061). */
+    public static final String COMPROBAR_PACIENTE = "COMPROBAR_PACIENTE";
 
     public static final String OK = "OK";
     public static final String ERROR = "ERROR";
@@ -160,6 +162,10 @@ public final class Protocolo {
         return componer(BAJA_PACIENTE, dni);
     }
 
+    public static String peticionComprobar(String dni) {
+        return componer(COMPROBAR_PACIENTE, dni);
+    }
+
     // ---- Respuestas ----
 
     /** Respuesta correcta con un paciente: {@code OK;<paciente>}. */
@@ -168,6 +174,21 @@ public final class Protocolo {
         campos.add(OK);
         campos.addAll(camposPaciente(paciente));
         return componer(campos);
+    }
+
+    /** Respuesta correcta de {@link #COMPROBAR_PACIENTE}: {@code OK;ACTIVO} u {@code OK;BAJA}. */
+    public static String respuestaOk(EstadoPaciente estado) {
+        return componer(OK, estado.name());
+    }
+
+    /**
+     * Estado de la respuesta de {@link #COMPROBAR_PACIENTE} (los campos que siguen a {@code OK}).
+     *
+     * @throws IllegalArgumentException si no hay exactamente un campo o no es un estado válido
+     */
+    public static EstadoPaciente estadoDesdeCampos(List<String> campos) {
+        comprobarNumeroCampos(campos, 0, 1);
+        return EstadoPaciente.valueOf(campos.get(0));
     }
 
     /** Respuesta de error: {@code ERROR;<código>} o {@code ERROR;<código>;<campo>}. */

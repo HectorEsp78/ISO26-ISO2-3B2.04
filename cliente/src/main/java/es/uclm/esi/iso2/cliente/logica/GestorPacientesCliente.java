@@ -4,6 +4,7 @@ import es.uclm.esi.iso2.cliente.servicio.ExcepcionServicio;
 import es.uclm.esi.iso2.cliente.servicio.ServicioPacientes;
 import es.uclm.esi.iso2.comun.dominio.CampoPaciente;
 import es.uclm.esi.iso2.comun.dominio.ErrorValidacion;
+import es.uclm.esi.iso2.comun.dominio.EstadoPaciente;
 import es.uclm.esi.iso2.comun.dominio.Paciente;
 import es.uclm.esi.iso2.comun.dominio.ValidadorPaciente;
 import es.uclm.esi.iso2.comun.protocolo.CodigoError;
@@ -42,6 +43,28 @@ public class GestorPacientesCliente {
             return errorDeValidacion(List.of(error.get()));
         }
         return llamar(() -> servicio.buscar(Paciente.normalizarDni(dni)), p -> null);
+    }
+
+    /**
+     * Comprueba si existe un paciente con ese DNI/NIE y si está activo, sin mostrar sus datos
+     * (DEC-061). Solo es correcto si el paciente existe y está activo; si está de baja o no
+     * existe, el resultado es un error con el mensaje correspondiente.
+     */
+    public Resultado comprobar(String dni) {
+        Optional<ErrorValidacion> error = validador.validarDni(dni);
+        if (error.isPresent()) {
+            return errorDeValidacion(List.of(error.get()));
+        }
+        String normalizado = Paciente.normalizarDni(dni);
+        try {
+            EstadoPaciente estado = servicio.comprobar(normalizado);
+            if (estado == EstadoPaciente.ACTIVO) {
+                return Resultado.correcto(null, "El paciente " + normalizado + " existe y está activo.");
+            }
+            return Resultado.error("El paciente " + normalizado + " existe, pero está dado de baja.", List.of());
+        } catch (ExcepcionServicio e) {
+            return resultadoDeError(e);
+        }
     }
 
     /** Flujo 6.1: da de alta un paciente. */
@@ -94,13 +117,17 @@ public class GestorPacientesCliente {
             Paciente resultado = operacion.get();
             return Resultado.correcto(resultado, mensajeExito.apply(resultado));
         } catch (ExcepcionServicio e) {
-            String mensaje = MensajesError.mensaje(e.codigo(), e.campo());
-            if (e.codigo() == CodigoError.SIN_CONEXION) {
-                return Resultado.sinConexion(mensaje);
-            }
-            CampoPaciente afectado = MensajesError.campoAfectado(e.codigo(), e.campo());
-            return Resultado.error(mensaje, afectado == null ? List.of() : List.of(afectado));
+            return resultadoDeError(e);
         }
+    }
+
+    private static Resultado resultadoDeError(ExcepcionServicio e) {
+        String mensaje = MensajesError.mensaje(e.codigo(), e.campo());
+        if (e.codigo() == CodigoError.SIN_CONEXION) {
+            return Resultado.sinConexion(mensaje);
+        }
+        CampoPaciente afectado = MensajesError.campoAfectado(e.codigo(), e.campo());
+        return Resultado.error(mensaje, afectado == null ? List.of() : List.of(afectado));
     }
 
     private static Resultado errorDeValidacion(List<ErrorValidacion> errores) {

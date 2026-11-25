@@ -24,6 +24,7 @@ public class PantallaBusquedaPacientes {
 
     @FXML private TextField campoDni;
     @FXML private Button botonBuscar;
+    @FXML private Button botonComprobar;
     @FXML private Button botonNuevo;
     @FXML private Label marcador;
     @FXML private VBox ficha;
@@ -55,6 +56,16 @@ public class PantallaBusquedaPacientes {
                 mostrarPaciente(null);
                 mostrarMensaje(resultado);
             }
+        });
+    }
+
+    /** Comprobación rápida para otros casos de uso (DEC-061): solo informa, no muestra la ficha. */
+    @FXML
+    private void comprobar() {
+        String dni = campoDni.getText();
+        TareaSegundoPlano.ejecutar(() -> gestor.comprobar(dni), this::ocupado, resultado -> {
+            mostrarPaciente(null);
+            mostrarMensaje(resultado);
         });
     }
 
@@ -125,6 +136,7 @@ public class PantallaBusquedaPacientes {
     private void ocupado(boolean ocupado) {
         campoDni.setDisable(ocupado);
         botonBuscar.setDisable(ocupado);
+        botonComprobar.setDisable(ocupado);
         botonNuevo.setDisable(ocupado);
         boolean editable = !ocupado && gestor.puedeModificar(pacienteActual);
         botonModificar.setDisable(!editable);

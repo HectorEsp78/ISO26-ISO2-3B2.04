@@ -54,6 +54,11 @@ class GestorPacientesClienteTest {
             public Paciente baja(String dni) {
                 throw new ExcepcionServicio(codigo);
             }
+
+            @Override
+            public EstadoPaciente comprobar(String dni) {
+                throw new ExcepcionServicio(codigo);
+            }
         };
         return new GestorPacientesCliente(falla);
     }
@@ -83,6 +88,44 @@ class GestorPacientesClienteTest {
         assertNull(r.paciente());
         assertEquals(MensajesError.mensaje(CodigoError.PACIENTE_NO_ENCONTRADO, null), r.mensaje());
         assertEquals(List.of(), r.camposConError());
+    }
+
+    // ---- Comprobación (DEC-061) ----
+
+    @Test
+    void comprobarUnPacienteActivo() {
+        servicio.alta(LUCIA);
+        Resultado r = gestor.comprobar("12345678z");
+        assertTrue(r.exito());
+        assertNull(r.paciente());
+        assertEquals("El paciente 12345678Z existe y está activo.", r.mensaje());
+    }
+
+    @Test
+    void comprobarUnPacienteDeBaja() {
+        servicio.alta(LUCIA);
+        servicio.baja(LUCIA.dni());
+        Resultado r = gestor.comprobar(LUCIA.dni());
+        assertFalse(r.exito());
+        assertEquals("El paciente 12345678Z existe, pero está dado de baja.", r.mensaje());
+    }
+
+    @Test
+    void comprobarUnPacienteQueNoExiste() {
+        Resultado r = gestor.comprobar("12345678Z");
+        assertFalse(r.exito());
+        assertEquals(MensajesError.mensaje(CodigoError.PACIENTE_NO_ENCONTRADO, null), r.mensaje());
+    }
+
+    @Test
+    void comprobarConDniNoValidoNoLlamaAlServicio() {
+        Resultado r = gestorQueFalla(CodigoError.ERROR_INTERNO).comprobar("");
+        assertEquals(List.of(CampoPaciente.DNI), r.camposConError());
+    }
+
+    @Test
+    void comprobarSinConexion() {
+        assertTrue(gestorQueFalla(CodigoError.SIN_CONEXION).comprobar("12345678Z").sinConexion());
     }
 
     // ---- Alta ----

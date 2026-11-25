@@ -87,6 +87,11 @@ public class ServicioPacientesEnMemoria implements ServicioPacientes {
         return deBaja;
     }
 
+    @Override
+    public synchronized EstadoPaciente comprobar(String dni) {
+        return existente(dni).estado();
+    }
+
     /** Pacientes guardados, en orden de alta. */
     public synchronized List<Paciente> todos() {
         return List.copyOf(pacientes.values());

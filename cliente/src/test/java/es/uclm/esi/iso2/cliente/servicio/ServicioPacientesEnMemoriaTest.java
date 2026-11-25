@@ -165,6 +165,31 @@ class ServicioPacientesEnMemoriaTest {
         assertError(CodigoError.PACIENTE_NO_ENCONTRADO, null, () -> servicio.baja(AHMED.dni()));
     }
 
+    // ---- Comprobación para otros casos de uso (DEC-061) ----
+
+    @Test
+    void comprobarDevuelveElEstado() {
+        servicio.alta(LUCIA);
+        servicio.alta(AHMED);
+        servicio.baja(AHMED.dni());
+        assertEquals(EstadoPaciente.ACTIVO, servicio.comprobar(" 12345678z "));
+        assertEquals(EstadoPaciente.BAJA, servicio.comprobar(AHMED.dni()));
+        assertError(CodigoError.PACIENTE_NO_ENCONTRADO, null, () -> servicio.comprobar("87654321X"));
+        assertError(CodigoError.CAMPO_NO_VALIDO, CampoPaciente.DNI, () -> servicio.comprobar("1234"));
+    }
+
+    @Test
+    void estaActivo() {
+        servicio.alta(LUCIA);
+        servicio.alta(AHMED);
+        servicio.baja(AHMED.dni());
+        assertTrue(servicio.estaActivo(LUCIA.dni()));
+        assertFalse(servicio.estaActivo(AHMED.dni()));
+        assertFalse(servicio.estaActivo("87654321X"));
+        // Los demás errores no se ocultan: un DNI no válido no es "no activo"
+        assertError(CodigoError.CAMPO_OBLIGATORIO, CampoPaciente.DNI, () -> servicio.estaActivo(""));
+    }
+
     // ---- Datos de ejemplo ----
 
     @Test

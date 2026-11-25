@@ -5,6 +5,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
@@ -26,6 +27,9 @@
                 <TextField fx:id="campoDni" promptText="12345678Z" prefColumnCount="12"
                            onAction="#buscar"/>
                 <Button fx:id="botonBuscar" text="Buscar" defaultButton="true" onAction="#buscar"/>
+                <Button fx:id="botonComprobar" text="Comprobar" onAction="#comprobar">
+                    <tooltip><Tooltip text="Indica si el paciente existe y está activo, sin mostrar sus datos"/></tooltip>
+                </Button>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="botonNuevo" text="Nuevo paciente" onAction="#nuevoPaciente"
                         styleClass="boton-principal"/>

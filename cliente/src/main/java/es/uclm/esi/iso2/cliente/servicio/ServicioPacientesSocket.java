@@ -1,5 +1,6 @@
 package es.uclm.esi.iso2.cliente.servicio;
 
+import es.uclm.esi.iso2.comun.dominio.EstadoPaciente;
 import es.uclm.esi.iso2.comun.dominio.Paciente;
 import es.uclm.esi.iso2.comun.protocolo.CodigoError;
 import es.uclm.esi.iso2.comun.protocolo.Protocolo;
@@ -58,6 +59,17 @@ public class ServicioPacientesSocket implements ServicioPacientes {
         return pedirPaciente(Protocolo.peticionBaja(dni));
     }
 
+    @Override
+    public EstadoPaciente comprobar(String dni) {
+        Respuesta respuesta = interpretar(enviar(Protocolo.peticionComprobar(dni)));
+        lanzarSiEsError(respuesta);
+        try {
+            return Protocolo.estadoDesdeCampos(respuesta.datos());
+        } catch (IllegalArgumentException e) {
+            throw new ExcepcionServicio(CodigoError.RESPUESTA_NO_VALIDA, null, e);
+        }
+    }
+
     public String host() {
         return host;
     }
@@ -68,13 +80,17 @@ public class ServicioPacientesSocket implements ServicioPacientes {
 
     private Paciente pedirPaciente(String peticion) {
         Respuesta respuesta = interpretar(enviar(peticion));
-        if (!respuesta.correcta()) {
-            throw new ExcepcionServicio(respuesta.codigo(), respuesta.campo());
-        }
+        lanzarSiEsError(respuesta);
         try {
             return Protocolo.pacienteDesdeCampos(respuesta.datos(), 0);
         } catch (IllegalArgumentException e) {
             throw new ExcepcionServicio(CodigoError.RESPUESTA_NO_VALIDA, null, e);
+        }
+    }
+
+    private static void lanzarSiEsError(Respuesta respuesta) {
+        if (!respuesta.correcta()) {
+            throw new ExcepcionServicio(respuesta.codigo(), respuesta.campo());
         }
     }
 

@@ -97,6 +97,17 @@ class ProtocoloTest {
     }
 
     @Test
+    void comprobarPaciente() {
+        assertEquals("COMPROBAR_PACIENTE;X1234567L", Protocolo.peticionComprobar("X1234567L"));
+        assertEquals("OK;ACTIVO", Protocolo.respuestaOk(EstadoPaciente.ACTIVO));
+        assertEquals("OK;BAJA", Protocolo.respuestaOk(EstadoPaciente.BAJA));
+        assertEquals(EstadoPaciente.BAJA, Protocolo.estadoDesdeCampos(List.of("BAJA")));
+        assertThrows(IllegalArgumentException.class, () -> Protocolo.estadoDesdeCampos(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> Protocolo.estadoDesdeCampos(List.of("ACTIVO", "x")));
+        assertThrows(IllegalArgumentException.class, () -> Protocolo.estadoDesdeCampos(List.of("ACTIVA")));
+    }
+
+    @Test
     void respuestas() {
         assertEquals("OK;12345678Z;CMCM000000000001;Lucía;García Martín;1985-04-12;MUJER;600111222;;"
                 + "C/ Mayor 1\\; 2º B;BAJA", Protocolo.respuestaOk(PACIENTE));
