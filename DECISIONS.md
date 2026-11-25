@@ -1089,6 +1089,36 @@ Alinea la configuración con la Definition of Done y evita que se integre códig
 ⏳ Pendiente de aprobación
 
 ---
+## DEC-061: Operación para comprobar si un paciente existe y está activo
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se añade al protocolo de la DEC-057 la operación `COMPROBAR_PACIENTE`, a petición del responsable de CU13, que necesita saber si un paciente existe y está activo antes de darle una cita:
+
+| Petición | Respuesta correcta | Errores posibles |
+|---|---|---|
+| `COMPROBAR_PACIENTE;<dni>` | `OK;ACTIVO` u `OK;BAJA` | `CAMPO_OBLIGATORIO`, `CAMPO_NO_VALIDO`, `PACIENTE_NO_ENCONTRADO` |
+
+- La respuesta solo incluye el estado, no los datos personales del paciente.
+- En el cliente, `ServicioPacientes` ofrece `comprobar(dni)`, que devuelve el estado, y `estaActivo(dni)`, que devuelve `false` si el paciente no existe o está de baja. Los demás errores (DNI no válido, sin conexión…) se lanzan como excepción y no se confunden con «no activo».
+- La pantalla de pacientes incluye un botón «Comprobar» que solo informa del resultado, sin mostrar la ficha.
+- El servidor de CU12 deberá atender esta operación.
+
+### Alternativas consideradas
+
+Que CU13 use `BUSCAR_PACIENTE`. Se descarta porque devuelve todos los datos del paciente cuando solo se necesita su estado, lo que va contra la confidencialidad (apartado 10 de la especificación de CU12).
+
+### Justificación
+
+Da a CU13, y a cualquier otro caso de uso que trabaje con pacientes, una forma única y sencilla de comprobar el paciente, sin duplicar la lógica ni exponer datos innecesarios.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -1103,3 +1133,4 @@ Alinea la configuración con la Definition of Done y evita que se integre códig
 | 23/11/2026 | Incorporadas las decisiones DEC-042 a DEC-048 derivadas de la especificación de CU13 (pendientes de aprobación). |
 | 24/11/2026 | Incorporadas las decisiones DEC-049 a DEC-054 derivadas de la sexta reunión de seguimiento (reparto individual de casos de uso, actualización del PUD, alcance de análisis, pruebas cruzadas y trabajo teórico). |
 | 25/11/2026 | Incorporadas las decisiones DEC-055 a DEC-060 derivadas del diseño de CU12 (datos del paciente, búsqueda por DNI, protocolo, módulo comun, estructura del cliente y cobertura), pendientes de aprobación. |
+| 25/11/2026 | Incorporada la decisión DEC-061 (operación COMPROBAR_PACIENTE para CU13), pendiente de aprobación. |
