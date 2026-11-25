@@ -32,3 +32,9 @@ target/
 ~$*
 # Sistemas de ficheros FUSE (ficheros borrados que siguen abiertos)
 .fuse_hidden*
+
+# Copias de seguridad automáticas de Visual Paradigm
+*.vpp.bak_*
+
+# Preparación de reuniones (documentos de trabajo locales, no se versionan)
+docs/reuniones/
