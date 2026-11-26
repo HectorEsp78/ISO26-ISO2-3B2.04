@@ -193,9 +193,17 @@ public final class Protocolo {
 
     /** Respuesta de error: {@code ERROR;<código>} o {@code ERROR;<código>;<campo>}. */
     public static String respuestaError(CodigoError codigo, CampoPaciente campo) {
-        return campo == null
+        return respuestaErrorConDetalle(codigo, campo == null ? null : campo.nombreProtocolo());
+    }
+
+    /**
+     * Respuesta de error con un dato de apoyo cualquiera: {@code ERROR;<código>} o
+     * {@code ERROR;<código>;<detalle>}. El detalle puede ser el nombre de un campo, un identificador, etc.
+     */
+    public static String respuestaErrorConDetalle(CodigoError codigo, String detalle) {
+        return detalle == null
                 ? componer(ERROR, codigo.name())
-                : componer(ERROR, codigo.name(), campo.nombreProtocolo());
+                : componer(ERROR, codigo.name(), detalle);
     }
 
     private static String peticionConDatos(String operacion, Paciente paciente) {

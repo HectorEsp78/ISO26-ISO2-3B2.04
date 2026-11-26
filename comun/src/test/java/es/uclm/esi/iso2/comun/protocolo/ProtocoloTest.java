@@ -114,5 +114,10 @@ class ProtocoloTest {
         assertEquals("ERROR;PACIENTE_NO_ENCONTRADO", Protocolo.respuestaError(CodigoError.PACIENTE_NO_ENCONTRADO, null));
         assertEquals("ERROR;CAMPO_OBLIGATORIO;telefono",
                 Protocolo.respuestaError(CodigoError.CAMPO_OBLIGATORIO, CampoPaciente.TELEFONO));
+        assertEquals("ERROR;PETICION_NO_VALIDA", Protocolo.respuestaErrorConDetalle(CodigoError.PETICION_NO_VALIDA, null));
+        assertEquals("ERROR;CAMPO_NO_VALIDO;hallazgos",
+                Protocolo.respuestaErrorConDetalle(CodigoError.CAMPO_NO_VALIDO, "hallazgos"));
+        assertEquals("ERROR;CAMPO_NO_VALIDO;a\\;b",
+                Protocolo.respuestaErrorConDetalle(CodigoError.CAMPO_NO_VALIDO, "a;b"));
     }
 }
