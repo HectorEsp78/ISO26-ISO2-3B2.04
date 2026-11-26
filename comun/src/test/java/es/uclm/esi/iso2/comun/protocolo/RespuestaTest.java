@@ -36,6 +36,7 @@ class RespuestaTest {
         assertFalse(r.correcta());
         assertEquals(CodigoError.DNI_DUPLICADO, r.codigo());
         assertNull(r.campo());
+        assertNull(r.detalle());
         assertEquals(List.of(), r.datos());
     }
 
@@ -44,11 +45,28 @@ class RespuestaTest {
         Respuesta r = Respuesta.leer("ERROR;CAMPO_NO_VALIDO;fechaNacimiento");
         assertEquals(CodigoError.CAMPO_NO_VALIDO, r.codigo());
         assertEquals(CampoPaciente.FECHA_NACIMIENTO, r.campo());
+        assertEquals("fechaNacimiento", r.detalle());
+    }
+
+    @Test
+    void errorConDetalleQueNoEsUnCampoDePaciente() {
+        Respuesta r = Respuesta.leer("ERROR;CAMPO_NO_VALIDO;hallazgos");
+        assertFalse(r.correcta());
+        assertEquals(CodigoError.CAMPO_NO_VALIDO, r.codigo());
+        assertNull(r.campo());
+        assertEquals("hallazgos", r.detalle());
+    }
+
+    @Test
+    void errorConDetalleEscapado() {
+        Respuesta r = Respuesta.leer("ERROR;CAMPO_NO_VALIDO;a\\;b");
+        assertNull(r.campo());
+        assertEquals("a;b", r.detalle());
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"", "PONG", "ERROR", "ERROR;DNI_DUPLICADO;dni;otro", "ERROR;NO_EXISTE",
-        "ERROR;CAMPO_NO_VALIDO;edad", "OK\\x"})
+        "OK\\x"})
     void respuestasNoValidas(String linea) {
         assertThrows(IllegalArgumentException.class, () -> Respuesta.leer(linea));
     }
