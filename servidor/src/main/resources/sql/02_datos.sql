@@ -18,3 +18,23 @@ VALUES
      NULL, NULL, 'ACTIVO'),
     ('87654321X', 'CMCM000000000003', 'Antonio', 'López Ruiz', '1948-02-01', 'HOMBRE', '926555666',
      NULL, 'Avda. de la Mancha 5, Toledo', 'BAJA');
+
+-- ---------------------------------------------------------------------
+-- CU13 Gestionar citas médicas: catálogo de ejemplo (DEC-047).
+-- Valores inventados para desarrollo, no son un catálogo clínico real.
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO tipo_prueba (id, nombre, duracion_minutos)
+VALUES
+    (1, 'Radiografía de tórax', 15),
+    (2, 'Ecografía abdominal', 30),
+    (3, 'Mamografía', 20),
+    (4, 'TAC craneal', 30),
+    (5, 'Resonancia magnética de rodilla', 45);
+
+INSERT IGNORE INTO recurso (id, nombre)
+VALUES
+    (1, 'Sala de rayos X 1'),
+    (2, 'Ecógrafo 1'),
+    (3, 'Mamógrafo 1'),
+    (4, 'TAC 1'),
+    (5, 'Resonancia 1');
