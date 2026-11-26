@@ -1089,6 +1089,7 @@ Alinea la configuración con la Definition of Done y evita que se integre códig
 ⏳ Pendiente de aprobación
 
 ---
+
 ## DEC-061: Operación para comprobar si un paciente existe y está activo
 
 **Fecha:** 25/11/2026
@@ -1119,6 +1120,687 @@ Da a CU13, y a cualquier otro caso de uso que trabaje con pacientes, una forma �
 ⏳ Pendiente de aprobación
 
 ---
+
+## DEC-062: Modelo de la cita y sus estados
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU13. La cita y lo que viaja con ella por el protocolo (`Cita`, `EstadoCita`, `TipoPrueba`, `Recurso`) van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`.
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| DNI del paciente | `String` | Sí | Formato de la DEC-055. El paciente debe existir y estar `ACTIVO` (RN-01, DEC-064). |
+| Tipo de prueba | `TipoPrueba` | Sí | Del catálogo de ejemplo (DEC-047). |
+| Recurso | `Recurso` | Sí | De la lista de ejemplo (DEC-047). |
+| Inicio | `LocalDateTime` | Sí | Posterior al momento actual (RN-02) y, con el fin, dentro del horario de la DEC-044 (RN-03). |
+| Duración | `int` (minutos) | Sí | Mayor que 0. Por defecto, la del tipo de prueba. |
+| Estado | `EstadoCita` | Sí | `PROGRAMADA`, `CANCELADA` o `REALIZADA`. Lo asigna el sistema: la cita se crea `PROGRAMADA`. |
+| Motivo de cancelación | `String` | Solo al cancelar | Entre 1 y 255 caracteres (DEC-046). |
+
+- El fin de la cita no se guarda como dato propio del modelo: se calcula como inicio más duración.
+- Dos citas se solapan si el inicio de cada una es anterior al fin de la otra (RN-06, DEC-043).
+- `TipoPrueba` tiene identificador, nombre y duración en minutos. `Recurso` tiene identificador y nombre.
+- El estado `REALIZADA` se incluye ya en CU13, aunque solo lo usa CU10 (DEC-063). Esto modifica la DEC-042, que decía que lo añadiría CU10.
+
+### Alternativas consideradas
+
+Que CU10 añada el estado `REALIZADA` cuando lo necesite, como decía la DEC-042. Se descarta porque obligaría a dos personas a modificar la misma clase en ramas distintas y provocaría conflictos al integrar.
+
+### Justificación
+
+La especificación dejaba sin concretar los tipos y el lugar de las clases, y sin ellos no se puede programar ni diseñar las pruebas. Poner las entidades en `comun` sigue el mismo criterio que CU12.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-063: Interfaz del servicio de citas (`ICitaService`)
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Las reglas de negocio de las citas están en `CitaService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.citas`), y el resto del sistema solo depende de la interfaz `ICitaService`:
+
+| Operación | Quién la usa | Qué hace | Si falla |
+|---|---|---|---|
+| `asignarCita(datos)` | CU13 | Crea una cita `PROGRAMADA`. Comprueba RN-01 a RN-06. | No guarda nada. |
+| `buscarCitas(dni, desde, hasta, estado)` | CU13 | Devuelve las citas que cumplen los filtros (cualquiera puede ir vacío), ordenadas por inicio. | — |
+| `reprogramarCita(id, datos)` | CU13 | Cambia fecha, recurso o duración de la misma cita (DEC-045). Comprueba los solapes sin contar la propia cita (RN-07). | La cita no cambia. |
+| `cancelarCita(id, motivo)` | CU13 | Pasa la cita a `CANCELADA` con su motivo (DEC-046). Solo si está `PROGRAMADA` y no ha empezado (RN-08). | La cita no cambia. |
+| `listarTiposPrueba()`, `listarRecursos()` | CU13 | Catálogos de ejemplo para el formulario (DEC-047). | — |
+| `obtenerCita(id)` | CU10 | Devuelve la cita con ese identificador. | `CITA_NO_ENCONTRADA`. |
+| `marcarRealizada(id)` | CU10 | Pasa una cita `PROGRAMADA` a `REALIZADA`. **No** aplica RN-08. | La cita no cambia. |
+| `marcarCancelada(id, motivo)` | CU10 | Pasa una cita `PROGRAMADA` a `CANCELADA` con su motivo. **No** aplica RN-08. | La cita no cambia. |
+| `cancelarCitasPendientes(dni, motivo)` | CU12 | Al dar de baja a un paciente, pasa todas sus citas `PROGRAMADA` a `CANCELADA` con el motivo «Baja del paciente» (DEC-048). Devuelve cuántas ha cancelado. | No cambia ninguna. |
+
+- `datos` es un objeto `DatosCita` con lo que introduce el usuario: DNI, tipo de prueba, recurso, inicio y duración. Se llama así para no confundirlo con la solicitud de CU06.
+- Los errores se lanzan como `CitaException` con un código de la DEC-065.
+- CU10 y CU12 llaman a sus operaciones desde el propio servidor; no necesitan mensajes de socket.
+
+### Alternativas consideradas
+
+Que CU10 reutilice `cancelarCita`. Se descarta porque RN-08 solo permite cancelar citas que no han empezado, y cuando se registra una prueba la cita ya ha empezado.
+
+### Justificación
+
+Una sola interfaz para todas las operaciones sobre citas evita que otros casos de uso modifiquen el código de CU13 y permite que CU01, CU06, CU14 y CU15 la reutilicen más adelante.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-064: Comprobación del paciente al asignar o reprogramar una cita
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Para cumplir RN-01, `CitaService` usa la operación `comprobar(dni)` de CU12 (DEC-061):
+
+- Si el paciente no existe, la cita se rechaza con `PACIENTE_NO_ENCONTRADO`.
+- Si está de baja (`BAJA`), se rechaza con `PACIENTE_DE_BAJA`.
+- Si está `ACTIVO`, se siguen comprobando las demás reglas.
+
+El cliente puede usar `estaActivo(dni)` de `ServicioPacientes` para avisar antes de enviar, pero el servidor lo vuelve a comprobar siempre.
+
+Mientras el servidor de CU12 no ofrezca esta operación, `CitaService` recibe en su constructor el objeto que hace la comprobación, y en las pruebas se usa una versión simulada con DNI de ejemplo (uno activo, uno de baja y uno que no existe).
+
+### Alternativas consideradas
+
+Usar `BUSCAR_PACIENTE`. Se descarta por el mismo motivo que en la DEC-061: devuelve datos personales que CU13 no necesita.
+
+### Justificación
+
+Reutiliza la operación que CU12 ya ofrece para este fin y permite desarrollar y probar CU13 sin esperar a que el servidor de CU12 esté terminado.
+
+### Estado
+
+⏳ Pendiente de aprobación (falta confirmar con el responsable de CU12 el nombre de la interfaz en el servidor)
+
+---
+
+## DEC-065: Operaciones del protocolo de sockets para CU13
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039, con el mismo formato, escape y puerto que la DEC-057:
+
+| Petición | Respuesta correcta |
+|---|---|
+| `ASIGNAR_CITA;<datos>` | `OK;<cita>` |
+| `BUSCAR_CITAS;<dni>;<desde>;<hasta>;<estado>` | `OK;<n>;<cita1>;<cita2>…` |
+| `REPROGRAMAR_CITA;<id>;<idRecurso>;<inicio>;<duracion>` | `OK;<cita>` |
+| `CANCELAR_CITA;<id>;<motivo>` | `OK;<cita>` |
+| `LISTAR_TIPOS_PRUEBA` | `OK;<n>;<id>;<nombre>;<duracion>…` |
+| `LISTAR_RECURSOS` | `OK;<n>;<id>;<nombre>…` |
+
+- `<datos>` son 5 campos en este orden: `dni;idTipoPrueba;idRecurso;inicio;duracion`.
+- `<cita>` son 9 campos: `id;dni;idTipoPrueba;idRecurso;inicio;duracion;fin;estado;motivo`.
+- En `BUSCAR_CITAS` un filtro vacío significa «sin filtro». Las fechas van en ISO (`aaaa-mm-dd`) y la fecha y hora en ISO (`aaaa-mm-ddThh:mm`).
+- Gracias al escape de la DEC-057, el motivo de cancelación puede contener `;` o saltos de línea.
+- Los nombres de las operaciones van en una clase `ProtocoloCitas` del módulo `comun`.
+
+Códigos de error (se añaden a `CodigoError`; los marcados con * ya existen):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato (indica el campo, CA-02). Incluye duración ≤ 0 y motivo vacío o de más de 255 caracteres. |
+| `PACIENTE_NO_ENCONTRADO`* / `PACIENTE_DE_BAJA`* | RN-01 (DEC-064). |
+| `FECHA_PASADA` | El inicio es anterior al momento actual (RN-02). |
+| `FUERA_DE_HORARIO` | La cita no empieza y termina dentro del horario de la DEC-044 (RN-03). |
+| `SOLAPE_RECURSO` / `SOLAPE_PACIENTE` | Choca con otra cita `PROGRAMADA` del recurso o del paciente (RN-04, RN-05). El error indica con qué cita choca. |
+| `CITA_NO_ENCONTRADA` | No existe una cita con ese identificador. |
+| `CITA_NO_MODIFICABLE` | La cita no está `PROGRAMADA` o, al reprogramar o cancelar, ya ha empezado (RN-08). |
+
+### Justificación
+
+Mantiene un único formato de protocolo en todo el sistema y deja a CU13 un contrato cerrado entre cliente y servidor, como hizo CU12.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-066: Tablas de citas y control de solapes
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+- Se añaden al script SQL (DEC-031) las tablas `tipo_prueba`, `recurso` y `cita`, con los datos de ejemplo de la DEC-047.
+- La tabla `cita` guarda también la hora de fin (`fin`) para poder consultar los solapes directamente, con índices por recurso y por paciente.
+- La comprobación de solape y el guardado de la cita se hacen en **una sola transacción**, bloqueando las citas afectadas (`SELECT … FOR UPDATE`), para que dos peticiones a la vez no creen citas solapadas (DEC-043).
+
+### Alternativas consideradas
+
+Un método `synchronized` en `CitaService`. Es más sencillo y válido con un único servidor, pero deja de funcionar si algún día hay más de uno.
+
+### Justificación
+
+Garantiza RN-04 y RN-05 aunque dos administrativos asignen citas al mismo tiempo.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-067: Enlace entre la cita y la solicitud
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+La cita de CU13 no guarda ninguna referencia a la solicitud. Es la solicitud (CU06) la que guarda el identificador de su cita. CU10 obtiene la cita desde la solicitud con `obtenerCita(id)` (DEC-063).
+
+### Alternativas consideradas
+
+Que la cita guarde el identificador de la solicitud. Se descarta porque en CU13 todavía no existen las solicitudes (llegan en CU06) y obligaría a cambiar el modelo de la cita ya especificado.
+
+### Justificación
+
+Mantiene la cita tal y como está especificada en CU13 y deja el enlace en el caso de uso que crea la solicitud. Corrige el supuesto de la especificación de CU10 de que «la cita se obtiene de la solicitud».
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU06 y CU10)
+
+---
+
+## DEC-068: Modelo del informe y de la imagen diagnóstica
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU09. `Informe`, `EstadoInforme`, `ImagenDiagnostica` y `FormatoImagen` van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`, y sus validaciones en `ValidadorInforme`, que usan igual el cliente y el servidor (DEC-055).
+
+Antes de validar se eliminan los espacios del principio y del final de los textos.
+
+**Informe**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Prueba | `long` | Sí | Prueba `REALIZADA` de CU10 de un paciente del médico (RN-01, RN-02). Única: un informe por prueba (RN-03). |
+| DNI del paciente | `String` | Automático | Se copia de la prueba al crear el informe; permite buscar por DNI sin consultar CU10 (el DNI no cambia, RN-03 de CU12). |
+| Médico autor | `String` | Sí | Identificador provisional del médico (DEC-072). |
+| Hallazgos | `String` | Sí | Entre 1 y 4000 caracteres. |
+| Conclusión | `String` | Sí | Entre 1 y 1000 caracteres. |
+| Estado | `EstadoInforme` | Sí | `BORRADOR` o `FINALIZADO`. Lo asigna el sistema: el informe se crea `BORRADOR`. |
+| Fecha de creación | `LocalDateTime` | Automático | La asigna el servidor. |
+| Fecha de finalización | `LocalDateTime` | Solo al finalizar | La asigna el servidor; vacía mientras es `BORRADOR`. |
+
+**Imagen diagnóstica**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Prueba | `long` | Sí | Prueba de CU10 de un paciente del médico. |
+| Nombre de fichero | `String` | Sí | Entre 1 y 100 caracteres, sin separadores de ruta (`/` ni `\`). |
+| Formato | `FormatoImagen` | Sí | `JPG` o `PNG`. DICOM solo se simula tras la interfaz de almacenamiento (DEC-071). |
+| Tamaño | `int` (bytes) | Sí | Entre 1 byte y 5 MB (5 242 880 bytes). |
+| Fecha de alta | `LocalDateTime` | Automático | La asigna el servidor. |
+
+- El tamaño máximo es de **5 MB** y no de 10 MB como proponía el apartado 8 de la especificación, porque la imagen viaja codificada en una sola línea del protocolo (DEC-070). Esto concreta el valor entre corchetes de la RN-07.
+- La imagen pertenece a la prueba, no al informe (RN-08). El contenido no se guarda en la base de datos (DEC-071).
+
+### Alternativas consideradas
+
+Mantener los 10 MB. Se descarta porque en base64 la línea llegaría a unos 14 MB, demasiado para un protocolo de texto de una sola línea por petición.
+
+### Justificación
+
+La especificación dejaba estos formatos y longitudes entre corchetes y sin ellos no se pueden programar las validaciones ni diseñar los casos de prueba (clases de equivalencia y valores límite).
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-069: Interfaces del servicio de informes y de sus colaboradores
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Las reglas de negocio de los informes están en `InformeService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.informes`) y el resto del sistema solo depende de la interfaz `IInformeService`:
+
+| Operación | Qué hace | Si falla |
+|---|---|---|
+| `crearInforme(idMedico, idPrueba, hallazgos, conclusion)` | Crea un informe `BORRADOR`. Comprueba RN-01 a RN-04. | No guarda nada. |
+| `editarInforme(idMedico, idInforme, hallazgos, conclusion)` | Cambia hallazgos y conclusión del mismo informe, solo si es `BORRADOR` (RN-05). | El informe no cambia. |
+| `finalizarInforme(idMedico, idInforme)` | Pasa un informe `BORRADOR` a `FINALIZADO` con su fecha y pide el aviso al paciente (RN-06). | El informe no cambia. |
+| `buscarInformes(idMedico, dni, idPrueba, desde, hasta, estado)` | Devuelve los informes del médico que cumplen los filtros (cualquiera puede ir vacío), ordenados por fecha de creación de más reciente a más antigua. | — |
+| `obtenerInforme(idMedico, idInforme)` | Devuelve un informe del médico. | `INFORME_NO_ENCONTRADO`. |
+| `adjuntarImagen(idMedico, idPrueba, nombre, formato, contenido)` | Valida y guarda una imagen asociada a la prueba (RN-07, RN-08). | No guarda nada. |
+| `listarImagenes(idMedico, idPrueba)` | Devuelve los datos de las imágenes de la prueba, sin su contenido. | — |
+| `obtenerImagen(idMedico, idImagen)` | Devuelve los datos y el contenido de una imagen. | `IMAGEN_NO_DISPONIBLE` si falta el fichero. |
+
+Los errores se lanzan como `InformeException` con un código de la DEC-070.
+
+`InformeService` recibe en su constructor las interfaces de las que depende. Así se puede desarrollar y probar sin que CU10 y CU02 estén integrados (plan v2.0, apartado 8.1):
+
+- `IConsultaPruebas` (la ofrece CU10): `obtenerPrueba(idPrueba)` devuelve `DatosPrueba` con `idPrueba`, `dniPaciente`, `idMedicoSolicitante` y `estado` (`REALIZADA` o `CANCELADA`), o lanza `PRUEBA_NO_ENCONTRADA`. Los nombres son provisionales: CU10 es quien define esta interfaz y habrá que acordarlos con su responsable.
+- `INotificador` (la ofrece CU02): `avisarInformeDisponible(dniPaciente, idInforme)`. Hasta It7 hay una versión simulada que solo registra el aviso. Si falla, el informe queda `FINALIZADO` igualmente (FA-11) y el fallo se registra.
+- `IAlmacenImagenes`: guarda y recupera el contenido de las imágenes (DEC-071).
+
+### Alternativas consideradas
+
+Que `InformeService` consulte directamente las tablas de pruebas de CU10. Se descarta porque ata CU09 al esquema de otro caso de uso y obliga a esperar a que exista.
+
+### Justificación
+
+Una sola interfaz por caso de uso evita que otros modifiquen el código de CU09 y permite que CU03 (historial) la reutilice más adelante. Las interfaces de CU10 y CU02 permiten trabajar en paralelo.
+
+### Estado
+
+⏳ Pendiente de aprobación (falta acordar con el responsable de CU10 la interfaz `IConsultaPruebas`)
+
+---
+
+## DEC-070: Operaciones del protocolo de sockets para CU09
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039 con el mismo formato, escape y puerto que la DEC-057:
+
+| Petición | Respuesta correcta |
+|---|---|
+| `CREAR_INFORME;<idMedico>;<idPrueba>;<hallazgos>;<conclusion>` | `OK;<informe>` |
+| `EDITAR_INFORME;<idMedico>;<idInforme>;<hallazgos>;<conclusion>` | `OK;<informe>` |
+| `FINALIZAR_INFORME;<idMedico>;<idInforme>` | `OK;<informe>` |
+| `BUSCAR_INFORMES;<idMedico>;<dni>;<idPrueba>;<desde>;<hasta>;<estado>` | `OK;<n>;<informe1>;<informe2>…` |
+| `OBTENER_INFORME;<idMedico>;<idInforme>` | `OK;<informe>` |
+| `SUBIR_IMAGEN;<idMedico>;<idPrueba>;<nombre>;<formato>;<contenido>` | `OK;<imagen>` |
+| `LISTAR_IMAGENES;<idMedico>;<idPrueba>` | `OK;<n>;<imagen1>;<imagen2>…` |
+| `OBTENER_IMAGEN;<idMedico>;<idImagen>` | `OK;<imagen>;<contenido>` |
+
+- `<informe>` son 9 campos: `id;idPrueba;dni;idMedico;hallazgos;conclusion;estado;fechaCreacion;fechaFinalizacion`.
+- `<imagen>` son 6 campos: `id;idPrueba;nombre;formato;tamano;fechaAlta`.
+- `<contenido>` es el contenido de la imagen en base64, en una sola línea.
+- Las fechas con hora van en ISO (`aaaa-mm-ddThh:mm`) y las de los filtros de búsqueda en ISO (`aaaa-mm-dd`). En `BUSCAR_INFORMES` un filtro vacío significa «sin filtro».
+- Gracias al escape de la DEC-057, los hallazgos y la conclusión pueden contener `;` y saltos de línea.
+
+Códigos de error (se añaden a `CodigoError`; los marcados con * ya existen):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato; indica el campo (CA-02). Incluye textos demasiado largos. |
+| `PRUEBA_NO_ENCONTRADA` | No existe la prueba (CA-03). |
+| `PRUEBA_NO_REALIZADA` | La prueba no está `REALIZADA` (RN-01, CA-03). |
+| `PRUEBA_NO_PERMITIDA` | La prueba no es de un paciente del médico (RN-02, CA-04). |
+| `INFORME_YA_EXISTE` | Ya hay un informe para esa prueba (RN-03, CA-05); el error indica su identificador. |
+| `INFORME_NO_ENCONTRADO` | No existe el informe, o no es de un paciente del médico. |
+| `INFORME_NO_EDITABLE` | El informe está `FINALIZADO` (RN-05, CA-06). |
+| `IMAGEN_FORMATO_NO_VALIDO` | El formato no es `JPG` ni `PNG` (CA-08). |
+| `IMAGEN_DEMASIADO_GRANDE` | El contenido supera 5 MB (CA-08). |
+| `IMAGEN_NO_DISPONIBLE` | La imagen está registrada pero su fichero no existe (CA-10). |
+
+- Hoy el tercer campo de un error es un `CampoPaciente`. Se generaliza a un texto libre («detalle») que pueda ser el nombre de un campo o un identificador. Este cambio en `Respuesta` y `CodigoError` (módulo `comun`) afecta también a CU12 y CU13 y se hará de acuerdo con sus responsables.
+
+### Justificación
+
+El cliente y el servidor se desarrollan por separado y necesitan un contrato cerrado. Los códigos de error permiten mostrar mensajes claros sin interpretar textos libres.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-071: Almacenamiento de las imágenes
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+- El contenido de cada imagen se guarda como un fichero en una carpeta del servidor (`radiodiagnostico.imagenes`, por defecto `imagenes/`), con el nombre `<idImagen>.<extension>`. Nunca se usa el nombre que envía el cliente para construir la ruta.
+- En MySQL solo se guardan sus datos y la referencia (DEC-072).
+- El acceso al almacenamiento se hace a través de la interfaz `IAlmacenImagenes` (`guardar`, `leer`), con dos implementaciones: `AlmacenImagenesEnDisco` y `AlmacenImagenesEnMemoria` para las pruebas.
+- DICOM solo se simula: un almacén DICOM real sería otra implementación de la misma interfaz y no forma parte de esta iteración.
+- Si el fichero no existe al leerlo, se responde `IMAGEN_NO_DISPONIBLE` y el resto de la consulta sigue funcionando (FA-09).
+- Al subir una imagen se guarda primero el fichero y después la fila en la base de datos; si esta falla, se borra el fichero.
+
+### Alternativas consideradas
+
+Guardar la imagen en la base de datos (`LONGBLOB`). Se descarta porque engorda la base de datos y complica el script SQL y las copias.
+
+### Justificación
+
+Es lo habitual con imágenes médicas y deja preparada la integración con DICOM (CU20) sin tocar el servicio.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-072: Tablas de informes e imágenes y control de concurrencia
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+- Se añaden al script SQL (DEC-031) las tablas `informe` e `imagen`:
+
+| Tabla | Columnas |
+|---|---|
+| `informe` | `id`, `id_prueba` (**UNIQUE**), `dni_paciente`, `id_medico`, `hallazgos`, `conclusion`, `estado`, `fecha_creacion`, `fecha_finalizacion`. Índices por `dni_paciente` y por `id_medico`. |
+| `imagen` | `id`, `id_prueba`, `nombre_fichero`, `formato`, `tamano`, `fecha_alta`. Índice por `id_prueba`. |
+
+- La restricción `UNIQUE` sobre `id_prueba` garantiza la RN-03 aunque dos médicos creen el informe a la vez: el segundo recibe `INFORME_YA_EXISTE`.
+- Editar y finalizar son actualizaciones condicionadas al estado (`UPDATE … WHERE id = ? AND estado = 'BORRADOR'`). Si no cambia ninguna fila, se responde `INFORME_NO_EDITABLE`, de modo que no se puede finalizar dos veces ni editar un informe ya finalizado.
+- El aviso al paciente se pide después de confirmar la transacción de finalizar.
+- **Identificación provisional del médico:** hasta que exista CU23, todas las peticiones de CU09 llevan el identificador del médico (texto de 1 a 20 caracteres) como primer campo. El servidor no lo verifica contra ninguna sesión. Con CU23 se sustituirá por el identificador de sesión, sin cambiar el resto del mensaje (RN-09).
+
+### Alternativas consideradas
+
+Un método `synchronized` en `InformeService`. Es más sencillo, pero deja de proteger si algún día hay más de un servidor.
+
+### Justificación
+
+Garantiza una única versión de cada informe sin depender del código de la aplicación y deja preparado el paso a CU23.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-073: Estructura del cliente de CU09
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+El cliente de CU09 sigue la estructura de la DEC-059:
+
+- **Presentación** (`es.uclm.esi.iso2.cliente.presentacion`): `PantallaBusquedaInformes`, `FormularioInforme` y `VisorImagenes`, con FXML. Solo muestran datos y recogen lo que escribe el usuario, sin lógica.
+- **Lógica** (`es.uclm.esi.iso2.cliente.logica`): `GestorInformesCliente` valida antes de enviar (campos obligatorios, longitudes, formato y tamaño de la imagen) y traduce los códigos de error de la DEC-070 en mensajes claros.
+- **Servicio** (`es.uclm.esi.iso2.cliente.servicio`): la interfaz `ServicioInformes` con `ServicioInformesSocket` (real) y `ServicioInformesEnMemoria` (aplica las mismas reglas sin red, para probar la interfaz y las pruebas JUnit).
+- Las imágenes se muestran con `ImageView` a partir de los bytes recibidos. Si una imagen no está disponible, se muestra un aviso en su lugar.
+- Las pantallas no ofrecen editar ni finalizar un informe `FINALIZADO`; el servidor lo rechaza igualmente (CA-06).
+- La cobertura de ramas del 75 % excluye el paquete `presentacion` (DEC-060).
+
+### Justificación
+
+Permite desarrollar y probar el cliente antes de que el servidor esté terminado y mantiene la misma estructura en todos los casos de uso.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-074: Modelo de la prueba y de la incidencia
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU10. `Prueba`, `Incidencia`, `EstadoPrueba` y `TipoIncidencia` van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`, y sus validaciones en `ValidadorPrueba`, que usan igual el cliente y el servidor (DEC-055). Antes de validar se eliminan los espacios del principio y del final de los textos.
+
+**Prueba**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Solicitud | `long` | Sí | Debe existir en CU06 y tener una cita `PROGRAMADA` (DEC-067). Solo puede haber una prueba por solicitud (RN-05). |
+| DNI del paciente | `String` | Automático | Se copia de la solicitud. Formato de la DEC-055. |
+| Médico | `String` | Sí | Médico que registra la prueba. De 1 a 20 caracteres, como en la DEC-072: llega en cada petición y no se verifica hasta que exista CU23. |
+| Estado | `EstadoPrueba` | Automático | `REALIZADA` o `CANCELADA`. Lo asigna el sistema según la operación. |
+| Fecha y hora de realización | `LocalDateTime` | Solo si `REALIZADA` | No posterior al momento actual (CA-09). Vacía si está `CANCELADA`. |
+| Observaciones | `String` | No | Como máximo 1000 caracteres. |
+| Motivo de cancelación | `String` | Solo si `CANCELADA` | Entre 1 y 255 caracteres (igual que DEC-046). Vacío si está `REALIZADA`. |
+| Fecha de registro | `LocalDateTime` | Automático | La asigna el servidor. |
+
+**Incidencia**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Prueba | `long` | Automático | Prueba a la que pertenece. |
+| Tipo | `TipoIncidencia` | Sí | `TECNICA`, `PACIENTE`, `MATERIAL` u `OTRA`. |
+| Descripción | `String` | Sí | Entre 1 y 500 caracteres. |
+| Fecha y hora | `LocalDateTime` | Automático | La asigna el servidor al guardarla. |
+
+- Una prueba `REALIZADA` lleva fecha de realización y no lleva motivo; una `CANCELADA` lleva motivo y no lleva fecha. Cualquier otra combinación es inválida.
+- Una prueba puede tener 0 o más incidencias.
+- Un paciente es «del médico» si el médico es el solicitante de la solicitud (RN-02). Es el mismo criterio que usa CU09 (DEC-068). El médico solicitante no se guarda en la prueba: se obtiene de la solicitud.
+
+### Alternativas consideradas
+
+Guardar un identificador numérico de paciente. Se descarta porque en el sistema el paciente se identifica por su DNI (DEC-055, DEC-062) y así CU09 puede buscar por DNI sin depender de las tablas de CU12.
+
+### Justificación
+
+La especificación dejaba sin concretar los tipos, las longitudes y el lugar de las clases, y sin ellos no se pueden programar las validaciones ni diseñar los casos de prueba (clases de equivalencia y valores límite). Poner las entidades en `comun` sigue el criterio de CU12, CU13 y CU09.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-075: Interfaces del servicio de pruebas (`IPruebaService` e `IConsultaPruebas`)
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Las reglas de negocio de CU10 están en `PruebaService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.pruebas`). El resto del sistema solo depende de estas dos interfaces:
+
+**`IPruebaService`** (la usa el controlador de sockets de CU10)
+
+| Operación | Qué hace | Si falla |
+|---|---|---|
+| `buscarSolicitudesPendientes(idMedico, dni)` | Devuelve las solicitudes del médico con cita `PROGRAMADA` y sin prueba. Con `dni` vacío, las de todos sus pacientes. Ordenadas por inicio de la cita. | — |
+| `registrarRealizacion(idMedico, idSolicitud, fechaHora, observaciones, incidencias)` | Guarda una prueba `REALIZADA` con sus incidencias, pone la cita en `REALIZADA` (`marcarRealizada`, DEC-063) y la solicitud en `REALIZADA`. | No cambia nada (DEC-076). |
+| `registrarCancelacion(idMedico, idSolicitud, motivo)` | Guarda una prueba `CANCELADA` con su motivo, pone la cita en `CANCELADA` (`marcarCancelada`, DEC-063) y la solicitud en `CANCELADA`. | No cambia nada (DEC-076). |
+| `anadirIncidencia(idMedico, idPrueba, tipo, descripcion)` | Añade una incidencia a una prueba ya registrada. No cambia la prueba, la cita ni la solicitud. | No cambia nada. |
+| `buscarPruebas(idMedico, dni, idSolicitud, desde, hasta, estado)` | Devuelve las pruebas del médico que cumplen los filtros (cualquiera puede ir vacío), ordenadas por fecha de registro. | — |
+| `consultarPrueba(idMedico, idPrueba)` | Devuelve la prueba con sus incidencias. | `PRUEBA_NO_ENCONTRADA` o `PRUEBA_NO_PERMITIDA`. |
+
+**`IConsultaPruebas`** (solo lectura; la usa CU09 desde el propio servidor, sin mensajes de socket). Concreta la interfaz que la DEC-069 de CU09 dejaba pendiente:
+
+| Operación | Qué hace | Si falla |
+|---|---|---|
+| `obtenerPrueba(idPrueba)` | Devuelve un `DatosPrueba` con `idPrueba`, `dniPaciente`, `idMedicoSolicitante` y `estado` (`REALIZADA` o `CANCELADA`). | `PRUEBA_NO_ENCONTRADA`. |
+
+- `DatosPrueba` es un objeto de solo lectura del paquete `es.uclm.esi.iso2.servidor.pruebas`. El `idMedicoSolicitante` se obtiene de la solicitud de CU06.
+- `obtenerPrueba` no comprueba qué médico pregunta: CU09 comprueba que la prueba está `REALIZADA` y que es de un paciente del médico (RN-01, RN-02 de CU09).
+- Los errores se lanzan como `PruebaException` con un código de la DEC-078.
+- Las operaciones de `IPruebaService` comprueban que el paciente de la solicitud o de la prueba es del médico (RN-02).
+- `PruebaService` recibe en su constructor lo que necesita de otros casos de uso: `ICitaService` (DEC-063), el servicio de solicitudes de CU06 y la comprobación del paciente de CU12 (DEC-064). Mientras no existan, en las pruebas se usan versiones simuladas.
+
+### Alternativas consideradas
+
+Que CU09 use las operaciones de `IPruebaService`. Se descarta porque esa interfaz también modifica datos y CU09 solo necesita saber si la prueba existe, de quién es y en qué estado está.
+
+### Justificación
+
+Una interfaz mínima y de solo lectura deja a CU09 un contrato estable y evita que otros casos de uso modifiquen pruebas por error.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con la responsable de CU09; sus nombres de la DEC-069 se mantienen)
+
+---
+
+## DEC-076: Registro de la prueba, la cita y la solicitud en una sola operación
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Registrar una prueba (realizada o cancelada) cambia tres cosas: guarda la prueba (CU10), cambia el estado de la cita (CU13) y cambia el estado de la solicitud (CU06). Deben hacerse las tres o ninguna (RN-07). El orden es:
+
+1. Validar los datos y comprobar la solicitud, el médico y la cita, sin cambiar nada.
+2. Guardar la prueba. La restricción `UNIQUE` de `id_solicitud` impide el duplicado aunque dos peticiones lleguen a la vez (CA-05).
+3. Llamar a `marcarRealizada` o `marcarCancelada` de `ICitaService`.
+4. Cambiar el estado de la solicitud.
+
+Si falla el paso 3 o el 4, se borra la prueba guardada en el paso 2 y se responde `ERROR_INTERNO`.
+
+Si el servidor permite que los repositorios de CU06, CU10 y CU13 compartan una única transacción de MySQL, se usará esa transacción y no hará falta borrar nada.
+
+### Alternativas consideradas
+
+Una transacción compartida siempre. Es la solución más limpia, pero la DEC-066 hace que cada servicio gestione la suya y hay que confirmar si pueden compartirse. Se deja como mejora si es posible.
+
+### Justificación
+
+Garantiza que nunca queda una prueba sin su cita y su solicitud actualizadas, con el menor cambio posible en el código de los demás casos de uso. Queda un riesgo pequeño: si falla el paso 4 después de cambiar la cita, la cita queda cambiada sin prueba. Se registra en el log para corregirlo a mano.
+
+### Estado
+
+⏳ Pendiente de aprobación (falta confirmar con los responsables de CU12 y CU13 si se puede compartir la transacción)
+
+---
+
+## DEC-077: Estados de la solicitud y de la cita al registrar la prueba
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+| Operación de CU10 | Prueba | Cita (CU13) | Solicitud (CU06) |
+|---|---|---|---|
+| `registrarRealizacion` | `REALIZADA` | `REALIZADA` | `REALIZADA` |
+| `registrarCancelacion` | `CANCELADA` | `CANCELADA` con el motivo | `CANCELADA` |
+
+- La cita se obtiene a partir de la solicitud, que guarda su identificador (DEC-067). Si la solicitud no tiene cita, o su cita no está `PROGRAMADA`, se rechaza con `SOLICITUD_SIN_CITA` (CA-03).
+- CU10 no aplica la restricción RN-08 de CU13 (la cita ya ha empezado): usa `marcarRealizada` y `marcarCancelada` de la DEC-063, no `cancelarCita`.
+- El estado `REALIZADA` de la cita ya lo incluye CU13 (DEC-062), por lo que CU10 no modifica el modelo de la cita. Esto sustituye lo que decían la DEC-042 y la especificación de CU10, que deberá actualizarse.
+- Los nombres exactos de los estados de la solicitud los fija CU06.
+
+### Justificación
+
+Deja claro qué cambia cada caso de uso y que CU10 solo llama a operaciones que los demás ya ofrecen, sin tocar su código.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU06 y CU13)
+
+---
+
+## DEC-078: Operaciones del protocolo de sockets para CU10
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039 con el mismo formato, escape y puerto que la DEC-057. Como en CU09 (DEC-072), todas las peticiones llevan el identificador del médico como primer campo.
+
+| Petición | Respuesta correcta |
+|---|---|
+| `LISTAR_SOLICITUDES_PENDIENTES;<idMedico>;<dni>` | `OK;<n>;<pendiente1>;<pendiente2>…` |
+| `REGISTRAR_PRUEBA;<idMedico>;<idSolicitud>;<fechaHora>;<observaciones>;<n>;<incidenciaNueva1>…` | `OK;<prueba>` |
+| `CANCELAR_PRUEBA;<idMedico>;<idSolicitud>;<motivo>` | `OK;<prueba>` |
+| `ANADIR_INCIDENCIA;<idMedico>;<idPrueba>;<tipo>;<descripcion>` | `OK;<incidencia>` |
+| `BUSCAR_PRUEBAS;<idMedico>;<dni>;<idSolicitud>;<desde>;<hasta>;<estado>` | `OK;<n>;<resumen1>;<resumen2>…` |
+| `OBTENER_PRUEBA;<idMedico>;<idPrueba>` | `OK;<prueba>` |
+
+- `<pendiente>` son 7 campos: `idSolicitud;dni;nombrePaciente;tipoPrueba;prioridad;idCita;inicioCita`.
+- `<incidenciaNueva>` son 2 campos: `tipo;descripcion`. `<incidencia>` son 4 campos: `id;tipo;descripcion;fechaHora`.
+- `<prueba>` son 9 campos seguidos de `<n>` y de las `n` incidencias: `id;idSolicitud;dni;idMedico;estado;fechaHoraRealizacion;observaciones;motivoCancelacion;fechaRegistro;<n>;<incidencia1>…`.
+- `<resumen>` son los 9 campos de la prueba, sin incidencias, más `numIncidencias`.
+- Los campos opcionales vacíos se envían como cadena vacía. En `BUSCAR_PRUEBAS` un filtro vacío significa «sin filtro». Las fechas de los filtros van en ISO (`aaaa-mm-dd`) y las fechas con hora en ISO (`aaaa-mm-ddThh:mm`).
+- Gracias al escape de la DEC-057, las observaciones y las descripciones pueden contener `;` o saltos de línea.
+- Los nombres de las operaciones van en una clase `ProtocoloPruebas` del módulo `comun`.
+
+Códigos de error (se añaden a `CodigoError`; los marcados con * ya existen o los define CU09 en la DEC-070):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato; indica el campo (CA-02). Incluye textos demasiado largos y tipo de incidencia desconocido. |
+| `PETICION_NO_VALIDA`* / `ERROR_INTERNO`* | Operación desconocida o número de campos incorrecto; fallo del servidor. |
+| `PRUEBA_NO_ENCONTRADA`* | No existe una prueba con ese identificador. |
+| `PRUEBA_NO_PERMITIDA`* | La prueba es de un paciente que no es del médico (RN-02). |
+| `FECHA_FUTURA` | La fecha de realización es posterior al momento actual (CA-09). |
+| `SOLICITUD_NO_ENCONTRADA` | La solicitud no existe. |
+| `SOLICITUD_NO_PERMITIDA` | La solicitud es de un paciente que no es del médico (RN-02, CA-04). |
+| `SOLICITUD_SIN_CITA` | La solicitud no tiene una cita `PROGRAMADA` (CA-03). |
+| `PRUEBA_YA_EXISTE` | La solicitud ya tiene una prueba registrada (CA-05); el error indica su identificador. |
+
+- El tercer campo de un error es un texto libre («detalle»: nombre de un campo o un identificador), como generaliza la DEC-070.
+
+### Justificación
+
+Mantiene un único formato de protocolo en todo el sistema y deja a CU10 un contrato cerrado entre cliente y servidor, como hicieron CU12, CU13 y CU09. Los nombres de operaciones y errores no chocan con los de CU09.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-079: Tablas de pruebas e incidencias
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se añaden al script SQL (DEC-031) las tablas `prueba` e `incidencia`:
+
+| Tabla | Columnas |
+|---|---|
+| `prueba` | `id`, `id_solicitud` (**UNIQUE**), `dni_paciente`, `id_medico`, `estado`, `fecha_hora_realizacion`, `observaciones` (1000), `motivo_cancelacion` (255), `fecha_registro`. Índice por (`id_medico`, `dni_paciente`). |
+| `incidencia` | `id`, `id_prueba` (clave ajena a `prueba`), `tipo`, `descripcion` (500), `fecha_hora`. |
+
+- Una restricción `CHECK` exige que una prueba `REALIZADA` tenga fecha y no tenga motivo, y que una `CANCELADA` tenga motivo y no tenga fecha.
+- Las claves ajenas de `id_solicitud` y `dni_paciente` se añadirán cuando existan las tablas de CU06 y CU12.
+- CU09 guarda en `informe` e `imagen` el identificador de la prueba (DEC-072); la clave ajena hacia `prueba` se añadirá cuando exista esta tabla.
+
+### Justificación
+
+La restricción `UNIQUE` garantiza una sola prueba por solicitud (RN-05, CA-05) aunque dos peticiones lleguen a la vez, y los `CHECK` mantienen coherentes el estado y los datos aunque falle una validación.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-080: Estructura del cliente de CU10
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+El cliente de CU10 sigue la estructura de la DEC-059 y de la DEC-073:
+
+- **Presentación** (`es.uclm.esi.iso2.cliente.presentacion`), con FXML y sin lógica: `PantallaSolicitudesPendientes` (búsqueda por DNI), `FormularioPrueba` (fecha, observaciones, incidencias y botón «Cancelar prueba» con su motivo), `PantallaBusquedaPruebas` y `DetallePrueba` (con «Añadir incidencia»).
+- **Lógica** (`es.uclm.esi.iso2.cliente.logica`): `GestorPruebasCliente` valida antes de enviar con `ValidadorPrueba` y traduce los códigos de error de la DEC-078 en mensajes claros.
+- **Servicio** (`es.uclm.esi.iso2.cliente.servicio`): la interfaz `ServicioPruebas` con `ServicioPruebasSocket` (real) y `ServicioPruebasEnMemoria` (aplica las mismas reglas sin red, para probar la interfaz y las pruebas JUnit).
+- Mientras no exista CU23, el identificador del médico se configura al arrancar el cliente (DEC-072).
+- El cliente nunca accede a la base de datos (CA-13). La cobertura de ramas del 75 % excluye el paquete `presentacion` (DEC-060).
+
+### Justificación
+
+Permite desarrollar y probar el cliente antes de que el servidor esté terminado y mantiene la misma estructura en todos los casos de uso.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -1134,3 +1816,5 @@ Da a CU13, y a cualquier otro caso de uso que trabaje con pacientes, una forma �
 | 24/11/2026 | Incorporadas las decisiones DEC-049 a DEC-054 derivadas de la sexta reunión de seguimiento (reparto individual de casos de uso, actualización del PUD, alcance de análisis, pruebas cruzadas y trabajo teórico). |
 | 25/11/2026 | Incorporadas las decisiones DEC-055 a DEC-060 derivadas del diseño de CU12 (datos del paciente, búsqueda por DNI, protocolo, módulo comun, estructura del cliente y cobertura), pendientes de aprobación. |
 | 25/11/2026 | Incorporada la decisión DEC-061 (operación COMPROBAR_PACIENTE para CU13), pendiente de aprobación. |
+| 25/11/2026 | Incorporadas las decisiones DEC-062 a DEC-067 derivadas del diseño de CU13 (modelo de la cita, interfaz del servicio, comprobación del paciente, protocolo, tablas y enlace con la solicitud), pendientes de aprobación. |
+| 26/11/2026 | Incorporadas las decisiones DEC-074 a DEC-080 derivadas del diseño de CU10 (modelo de la prueba, interfaces, registro atómico, estados, protocolo, tablas y cliente), pendientes de aprobación. |

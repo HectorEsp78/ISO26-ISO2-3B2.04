@@ -32,11 +32,23 @@ public enum CampoPaciente {
      * @throws IllegalArgumentException si no existe ese campo
      */
     public static CampoPaciente desdeNombreProtocolo(String nombre) {
+        CampoPaciente campo = buscarPorNombreProtocolo(nombre);
+        if (campo == null) {
+            throw new IllegalArgumentException("Campo de paciente desconocido: " + nombre);
+        }
+        return campo;
+    }
+
+    /**
+     * Devuelve el campo cuyo nombre de protocolo es el indicado, o {@code null} si no es un campo
+     * de paciente (por ejemplo, si el error es de otro caso de uso).
+     */
+    public static CampoPaciente buscarPorNombreProtocolo(String nombre) {
         for (CampoPaciente campo : values()) {
             if (campo.nombreProtocolo.equals(nombre)) {
                 return campo;
             }
         }
-        throw new IllegalArgumentException("Campo de paciente desconocido: " + nombre);
+        return null;
     }
 }
