@@ -1317,6 +1317,236 @@ Mantiene la cita tal y como está especificada en CU13 y deja el enlace en el ca
 ⏳ Pendiente de aprobación (de acuerdo con los responsables de CU06 y CU10)
 
 ---
+
+## DEC-068: Modelo del informe y de la imagen diagnóstica
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU09. `Informe`, `EstadoInforme`, `ImagenDiagnostica` y `FormatoImagen` van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`, y sus validaciones en `ValidadorInforme`, que usan igual el cliente y el servidor (DEC-055).
+
+Antes de validar se eliminan los espacios del principio y del final de los textos.
+
+**Informe**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Prueba | `long` | Sí | Prueba `REALIZADA` de CU10 de un paciente del médico (RN-01, RN-02). Única: un informe por prueba (RN-03). |
+| DNI del paciente | `String` | Automático | Se copia de la prueba al crear el informe; permite buscar por DNI sin consultar CU10 (el DNI no cambia, RN-03 de CU12). |
+| Médico autor | `String` | Sí | Identificador provisional del médico (DEC-072). |
+| Hallazgos | `String` | Sí | Entre 1 y 4000 caracteres. |
+| Conclusión | `String` | Sí | Entre 1 y 1000 caracteres. |
+| Estado | `EstadoInforme` | Sí | `BORRADOR` o `FINALIZADO`. Lo asigna el sistema: el informe se crea `BORRADOR`. |
+| Fecha de creación | `LocalDateTime` | Automático | La asigna el servidor. |
+| Fecha de finalización | `LocalDateTime` | Solo al finalizar | La asigna el servidor; vacía mientras es `BORRADOR`. |
+
+**Imagen diagnóstica**
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| Prueba | `long` | Sí | Prueba de CU10 de un paciente del médico. |
+| Nombre de fichero | `String` | Sí | Entre 1 y 100 caracteres, sin separadores de ruta (`/` ni `\`). |
+| Formato | `FormatoImagen` | Sí | `JPG` o `PNG`. DICOM solo se simula tras la interfaz de almacenamiento (DEC-071). |
+| Tamaño | `int` (bytes) | Sí | Entre 1 byte y 5 MB (5 242 880 bytes). |
+| Fecha de alta | `LocalDateTime` | Automático | La asigna el servidor. |
+
+- El tamaño máximo es de **5 MB** y no de 10 MB como proponía el apartado 8 de la especificación, porque la imagen viaja codificada en una sola línea del protocolo (DEC-070). Esto concreta el valor entre corchetes de la RN-07.
+- La imagen pertenece a la prueba, no al informe (RN-08). El contenido no se guarda en la base de datos (DEC-071).
+
+### Alternativas consideradas
+
+Mantener los 10 MB. Se descarta porque en base64 la línea llegaría a unos 14 MB, demasiado para un protocolo de texto de una sola línea por petición.
+
+### Justificación
+
+La especificación dejaba estos formatos y longitudes entre corchetes y sin ellos no se pueden programar las validaciones ni diseñar los casos de prueba (clases de equivalencia y valores límite).
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-069: Interfaces del servicio de informes y de sus colaboradores
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Las reglas de negocio de los informes están en `InformeService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.informes`) y el resto del sistema solo depende de la interfaz `IInformeService`:
+
+| Operación | Qué hace | Si falla |
+|---|---|---|
+| `crearInforme(idMedico, idPrueba, hallazgos, conclusion)` | Crea un informe `BORRADOR`. Comprueba RN-01 a RN-04. | No guarda nada. |
+| `editarInforme(idMedico, idInforme, hallazgos, conclusion)` | Cambia hallazgos y conclusión del mismo informe, solo si es `BORRADOR` (RN-05). | El informe no cambia. |
+| `finalizarInforme(idMedico, idInforme)` | Pasa un informe `BORRADOR` a `FINALIZADO` con su fecha y pide el aviso al paciente (RN-06). | El informe no cambia. |
+| `buscarInformes(idMedico, dni, idPrueba, desde, hasta, estado)` | Devuelve los informes del médico que cumplen los filtros (cualquiera puede ir vacío), ordenados por fecha de creación de más reciente a más antigua. | — |
+| `obtenerInforme(idMedico, idInforme)` | Devuelve un informe del médico. | `INFORME_NO_ENCONTRADO`. |
+| `adjuntarImagen(idMedico, idPrueba, nombre, formato, contenido)` | Valida y guarda una imagen asociada a la prueba (RN-07, RN-08). | No guarda nada. |
+| `listarImagenes(idMedico, idPrueba)` | Devuelve los datos de las imágenes de la prueba, sin su contenido. | — |
+| `obtenerImagen(idMedico, idImagen)` | Devuelve los datos y el contenido de una imagen. | `IMAGEN_NO_DISPONIBLE` si falta el fichero. |
+
+Los errores se lanzan como `InformeException` con un código de la DEC-070.
+
+`InformeService` recibe en su constructor las interfaces de las que depende. Así se puede desarrollar y probar sin que CU10 y CU02 estén integrados (plan v2.0, apartado 8.1):
+
+- `IConsultaPruebas` (la ofrece CU10): `obtenerPrueba(idPrueba)` devuelve `DatosPrueba` con `idPrueba`, `dniPaciente`, `idMedicoSolicitante` y `estado` (`REALIZADA` o `CANCELADA`), o lanza `PRUEBA_NO_ENCONTRADA`. Los nombres son provisionales: CU10 es quien define esta interfaz y habrá que acordarlos con su responsable.
+- `INotificador` (la ofrece CU02): `avisarInformeDisponible(dniPaciente, idInforme)`. Hasta It7 hay una versión simulada que solo registra el aviso. Si falla, el informe queda `FINALIZADO` igualmente (FA-11) y el fallo se registra.
+- `IAlmacenImagenes`: guarda y recupera el contenido de las imágenes (DEC-071).
+
+### Alternativas consideradas
+
+Que `InformeService` consulte directamente las tablas de pruebas de CU10. Se descarta porque ata CU09 al esquema de otro caso de uso y obliga a esperar a que exista.
+
+### Justificación
+
+Una sola interfaz por caso de uso evita que otros modifiquen el código de CU09 y permite que CU03 (historial) la reutilice más adelante. Las interfaces de CU10 y CU02 permiten trabajar en paralelo.
+
+### Estado
+
+⏳ Pendiente de aprobación (falta acordar con el responsable de CU10 la interfaz `IConsultaPruebas`)
+
+---
+
+## DEC-070: Operaciones del protocolo de sockets para CU09
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039 con el mismo formato, escape y puerto que la DEC-057:
+
+| Petición | Respuesta correcta |
+|---|---|
+| `CREAR_INFORME;<idMedico>;<idPrueba>;<hallazgos>;<conclusion>` | `OK;<informe>` |
+| `EDITAR_INFORME;<idMedico>;<idInforme>;<hallazgos>;<conclusion>` | `OK;<informe>` |
+| `FINALIZAR_INFORME;<idMedico>;<idInforme>` | `OK;<informe>` |
+| `BUSCAR_INFORMES;<idMedico>;<dni>;<idPrueba>;<desde>;<hasta>;<estado>` | `OK;<n>;<informe1>;<informe2>…` |
+| `OBTENER_INFORME;<idMedico>;<idInforme>` | `OK;<informe>` |
+| `SUBIR_IMAGEN;<idMedico>;<idPrueba>;<nombre>;<formato>;<contenido>` | `OK;<imagen>` |
+| `LISTAR_IMAGENES;<idMedico>;<idPrueba>` | `OK;<n>;<imagen1>;<imagen2>…` |
+| `OBTENER_IMAGEN;<idMedico>;<idImagen>` | `OK;<imagen>;<contenido>` |
+
+- `<informe>` son 9 campos: `id;idPrueba;dni;idMedico;hallazgos;conclusion;estado;fechaCreacion;fechaFinalizacion`.
+- `<imagen>` son 6 campos: `id;idPrueba;nombre;formato;tamano;fechaAlta`.
+- `<contenido>` es el contenido de la imagen en base64, en una sola línea.
+- Las fechas con hora van en ISO (`aaaa-mm-ddThh:mm`) y las de los filtros de búsqueda en ISO (`aaaa-mm-dd`). En `BUSCAR_INFORMES` un filtro vacío significa «sin filtro».
+- Gracias al escape de la DEC-057, los hallazgos y la conclusión pueden contener `;` y saltos de línea.
+
+Códigos de error (se añaden a `CodigoError`; los marcados con * ya existen):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato; indica el campo (CA-02). Incluye textos demasiado largos. |
+| `PRUEBA_NO_ENCONTRADA` | No existe la prueba (CA-03). |
+| `PRUEBA_NO_REALIZADA` | La prueba no está `REALIZADA` (RN-01, CA-03). |
+| `PRUEBA_NO_PERMITIDA` | La prueba no es de un paciente del médico (RN-02, CA-04). |
+| `INFORME_YA_EXISTE` | Ya hay un informe para esa prueba (RN-03, CA-05); el error indica su identificador. |
+| `INFORME_NO_ENCONTRADO` | No existe el informe, o no es de un paciente del médico. |
+| `INFORME_NO_EDITABLE` | El informe está `FINALIZADO` (RN-05, CA-06). |
+| `IMAGEN_FORMATO_NO_VALIDO` | El formato no es `JPG` ni `PNG` (CA-08). |
+| `IMAGEN_DEMASIADO_GRANDE` | El contenido supera 5 MB (CA-08). |
+| `IMAGEN_NO_DISPONIBLE` | La imagen está registrada pero su fichero no existe (CA-10). |
+
+- Hoy el tercer campo de un error es un `CampoPaciente`. Se generaliza a un texto libre («detalle») que pueda ser el nombre de un campo o un identificador. Este cambio en `Respuesta` y `CodigoError` (módulo `comun`) afecta también a CU12 y CU13 y se hará de acuerdo con sus responsables.
+
+### Justificación
+
+El cliente y el servidor se desarrollan por separado y necesitan un contrato cerrado. Los códigos de error permiten mostrar mensajes claros sin interpretar textos libres.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-071: Almacenamiento de las imágenes
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+- El contenido de cada imagen se guarda como un fichero en una carpeta del servidor (`radiodiagnostico.imagenes`, por defecto `imagenes/`), con el nombre `<idImagen>.<extension>`. Nunca se usa el nombre que envía el cliente para construir la ruta.
+- En MySQL solo se guardan sus datos y la referencia (DEC-072).
+- El acceso al almacenamiento se hace a través de la interfaz `IAlmacenImagenes` (`guardar`, `leer`), con dos implementaciones: `AlmacenImagenesEnDisco` y `AlmacenImagenesEnMemoria` para las pruebas.
+- DICOM solo se simula: un almacén DICOM real sería otra implementación de la misma interfaz y no forma parte de esta iteración.
+- Si el fichero no existe al leerlo, se responde `IMAGEN_NO_DISPONIBLE` y el resto de la consulta sigue funcionando (FA-09).
+- Al subir una imagen se guarda primero el fichero y después la fila en la base de datos; si esta falla, se borra el fichero.
+
+### Alternativas consideradas
+
+Guardar la imagen en la base de datos (`LONGBLOB`). Se descarta porque engorda la base de datos y complica el script SQL y las copias.
+
+### Justificación
+
+Es lo habitual con imágenes médicas y deja preparada la integración con DICOM (CU20) sin tocar el servicio.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-072: Tablas de informes e imágenes y control de concurrencia
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+- Se añaden al script SQL (DEC-031) las tablas `informe` e `imagen`:
+
+| Tabla | Columnas |
+|---|---|
+| `informe` | `id`, `id_prueba` (**UNIQUE**), `dni_paciente`, `id_medico`, `hallazgos`, `conclusion`, `estado`, `fecha_creacion`, `fecha_finalizacion`. Índices por `dni_paciente` y por `id_medico`. |
+| `imagen` | `id`, `id_prueba`, `nombre_fichero`, `formato`, `tamano`, `fecha_alta`. Índice por `id_prueba`. |
+
+- La restricción `UNIQUE` sobre `id_prueba` garantiza la RN-03 aunque dos médicos creen el informe a la vez: el segundo recibe `INFORME_YA_EXISTE`.
+- Editar y finalizar son actualizaciones condicionadas al estado (`UPDATE … WHERE id = ? AND estado = 'BORRADOR'`). Si no cambia ninguna fila, se responde `INFORME_NO_EDITABLE`, de modo que no se puede finalizar dos veces ni editar un informe ya finalizado.
+- El aviso al paciente se pide después de confirmar la transacción de finalizar.
+- **Identificación provisional del médico:** hasta que exista CU23, todas las peticiones de CU09 llevan el identificador del médico (texto de 1 a 20 caracteres) como primer campo. El servidor no lo verifica contra ninguna sesión. Con CU23 se sustituirá por el identificador de sesión, sin cambiar el resto del mensaje (RN-09).
+
+### Alternativas consideradas
+
+Un método `synchronized` en `InformeService`. Es más sencillo, pero deja de proteger si algún día hay más de un servidor.
+
+### Justificación
+
+Garantiza una única versión de cada informe sin depender del código de la aplicación y deja preparado el paso a CU23.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-073: Estructura del cliente de CU09
+
+**Fecha:** 26/11/2026
+
+### Decisión
+
+El cliente de CU09 sigue la estructura de la DEC-059:
+
+- **Presentación** (`es.uclm.esi.iso2.cliente.presentacion`): `PantallaBusquedaInformes`, `FormularioInforme` y `VisorImagenes`, con FXML. Solo muestran datos y recogen lo que escribe el usuario, sin lógica.
+- **Lógica** (`es.uclm.esi.iso2.cliente.logica`): `GestorInformesCliente` valida antes de enviar (campos obligatorios, longitudes, formato y tamaño de la imagen) y traduce los códigos de error de la DEC-070 en mensajes claros.
+- **Servicio** (`es.uclm.esi.iso2.cliente.servicio`): la interfaz `ServicioInformes` con `ServicioInformesSocket` (real) y `ServicioInformesEnMemoria` (aplica las mismas reglas sin red, para probar la interfaz y las pruebas JUnit).
+- Las imágenes se muestran con `ImageView` a partir de los bytes recibidos. Si una imagen no está disponible, se muestra un aviso en su lugar.
+- Las pantallas no ofrecen editar ni finalizar un informe `FINALIZADO`; el servidor lo rechaza igualmente (CA-06).
+- La cobertura de ramas del 75 % excluye el paquete `presentacion` (DEC-060).
+
+### Justificación
+
+Permite desarrollar y probar el cliente antes de que el servidor esté terminado y mantiene la misma estructura en todos los casos de uso.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
