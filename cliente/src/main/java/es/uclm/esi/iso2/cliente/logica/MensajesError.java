@@ -65,6 +65,14 @@ public final class MensajesError {
             case SOLAPE_PACIENTE -> "El paciente ya tiene otra cita a esa hora.";
             case CITA_NO_ENCONTRADA -> "No existe esa cita.";
             case CITA_NO_MODIFICABLE -> "La cita ya no se puede modificar: está cancelada o realizada, o ya ha empezado.";
+            // CU10 Registrar realización de prueba (DEC-078)
+            case FECHA_FUTURA -> "La fecha y hora de realización no pueden ser posteriores al momento actual.";
+            case SOLICITUD_NO_ENCONTRADA -> "No existe esa solicitud de prueba.";
+            case SOLICITUD_NO_PERMITIDA -> "Esa solicitud es de un paciente que no es tuyo.";
+            case SOLICITUD_SIN_CITA -> "La solicitud no tiene una cita programada, así que no se puede registrar su prueba.";
+            case PRUEBA_YA_EXISTE -> "Esa solicitud ya tiene una prueba registrada.";
+            case PRUEBA_NO_ENCONTRADA -> "No existe esa prueba.";
+            case PRUEBA_NO_PERMITIDA -> "Esa prueba es de un paciente que no es tuyo.";
         };
     }
 
