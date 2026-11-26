@@ -47,4 +47,20 @@ public enum CodigoError {
     CITA_NO_ENCONTRADA,
     /** La cita no está PROGRAMADA o, al reprogramar o cancelar, ya ha empezado (RN-08). */
     CITA_NO_MODIFICABLE,
+
+    // --- CU10 ---
+    /** La fecha de realización de la prueba es posterior al momento actual (CA-09). */
+    FECHA_FUTURA,
+    /** No existe ninguna solicitud con ese identificador. */
+    SOLICITUD_NO_ENCONTRADA,
+    /** La solicitud es de un paciente que no es del médico (RN-02, CA-04). */
+    SOLICITUD_NO_PERMITIDA,
+    /** La solicitud no tiene una cita PROGRAMADA (CA-03). */
+    SOLICITUD_SIN_CITA,
+    /** La solicitud ya tiene una prueba registrada (CA-05). La respuesta indica su id. */
+    PRUEBA_YA_EXISTE,
+    /** No existe ninguna prueba con ese identificador. También la define CU09: conservar una sola al integrar. */
+    PRUEBA_NO_ENCONTRADA,
+    /** La prueba es de un paciente que no es del médico (RN-02). También la define CU09: conservar una sola al integrar. */
+    PRUEBA_NO_PERMITIDA,
 }

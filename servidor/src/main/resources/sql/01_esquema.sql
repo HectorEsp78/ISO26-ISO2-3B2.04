@@ -68,3 +68,38 @@ CREATE TABLE IF NOT EXISTS cita (
     INDEX idx_cita_recurso (id_recurso, inicio, fin),
     INDEX idx_cita_paciente (dni_paciente, inicio, fin)
 );
+
+-- ---------------------------------------------------------------------
+-- CU10 Registrar realización de prueba (DEC-079)
+-- ---------------------------------------------------------------------
+-- id_solicitud es UNIQUE: una solicitud solo puede tener una prueba, aunque dos peticiones
+-- lleguen a la vez (CA-05). Sin claves ajenas a solicitud (CU06), paciente (CU12) ni cita (CU13),
+-- para no atar el esquema a los de otros casos de uso; el servidor comprueba todo antes de guardar.
+CREATE TABLE IF NOT EXISTS prueba (
+    id                     BIGINT        NOT NULL AUTO_INCREMENT,
+    id_solicitud           BIGINT        NOT NULL,
+    dni_paciente           CHAR(9)       NOT NULL,
+    id_medico              VARCHAR(20)   NOT NULL,
+    estado                 VARCHAR(10)   NOT NULL,
+    fecha_hora_realizacion DATETIME      NULL,
+    observaciones          VARCHAR(1000) NULL,
+    motivo_cancelacion     VARCHAR(255)  NULL,
+    fecha_registro         DATETIME      NOT NULL,
+    CONSTRAINT pk_prueba PRIMARY KEY (id),
+    CONSTRAINT uk_prueba_solicitud UNIQUE (id_solicitud),
+    CONSTRAINT ck_prueba_estado CHECK (estado IN ('REALIZADA', 'CANCELADA')),
+    INDEX idx_prueba_medico (id_medico, fecha_registro),
+    INDEX idx_prueba_paciente (dni_paciente)
+);
+
+CREATE TABLE IF NOT EXISTS incidencia (
+    id          BIGINT       NOT NULL AUTO_INCREMENT,
+    id_prueba   BIGINT       NOT NULL,
+    tipo        VARCHAR(10)  NOT NULL,
+    descripcion VARCHAR(500) NOT NULL,
+    fecha_hora  DATETIME     NOT NULL,
+    CONSTRAINT pk_incidencia PRIMARY KEY (id),
+    CONSTRAINT fk_incidencia_prueba FOREIGN KEY (id_prueba) REFERENCES prueba (id),
+    CONSTRAINT ck_incidencia_tipo CHECK (tipo IN ('TECNICA', 'PACIENTE', 'MATERIAL', 'OTRA')),
+    INDEX idx_incidencia_prueba (id_prueba)
+);

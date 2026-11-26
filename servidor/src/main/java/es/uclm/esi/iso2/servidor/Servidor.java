@@ -9,12 +9,18 @@ import es.uclm.esi.iso2.servidor.pacientes.IPacienteService;
 import es.uclm.esi.iso2.servidor.pacientes.PacienteDAO;
 import es.uclm.esi.iso2.servidor.pacientes.PacienteService;
 import es.uclm.esi.iso2.servidor.persistencia.FabricaConexiones;
+import es.uclm.esi.iso2.servidor.pruebas.IConsultaPruebas;
+import es.uclm.esi.iso2.servidor.pruebas.PruebaDAO;
+import es.uclm.esi.iso2.servidor.pruebas.PruebaService;
+import es.uclm.esi.iso2.servidor.pruebas.SolicitudesDePrueba;
 import es.uclm.esi.iso2.servidor.red.ManejadorPeticiones;
 import es.uclm.esi.iso2.servidor.red.OperacionesCitas;
 import es.uclm.esi.iso2.servidor.red.OperacionesPacientes;
+import es.uclm.esi.iso2.servidor.red.OperacionesPruebas;
 import es.uclm.esi.iso2.servidor.red.ServidorSockets;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -26,10 +32,12 @@ public final class Servidor implements AutoCloseable {
 
     private final ServidorSockets sockets;
     private final IPacienteService pacientes;
+    private final IConsultaPruebas consultaPruebas;
 
-    private Servidor(ServidorSockets sockets, IPacienteService pacientes) {
+    private Servidor(ServidorSockets sockets, IPacienteService pacientes, IConsultaPruebas consultaPruebas) {
         this.sockets = sockets;
         this.pacientes = pacientes;
+        this.consultaPruebas = consultaPruebas;
     }
 
     /**
@@ -55,7 +63,12 @@ public final class Servidor implements AutoCloseable {
         OperacionesPacientes.registrar(manejador, pacientes);
         OperacionesCitas.registrar(manejador, citas);
 
-        return new Servidor(new ServidorSockets(puerto, manejador), pacientes);
+        // CU10. Mientras CU06 no exista no hay solicitudes (SIN_CU06): cuando exista, se pasa aquí su adaptador.
+        PruebaService pruebas = new PruebaService(new PruebaDAO(conexiones), citas, SolicitudesDePrueba.SIN_CU06,
+                pacientes, Clock.systemDefaultZone());
+        OperacionesPruebas.registrar(manejador, pruebas);
+
+        return new Servidor(new ServidorSockets(puerto, manejador), pacientes, pruebas);
     }
 
     public void arrancar() {
@@ -69,6 +82,11 @@ public final class Servidor implements AutoCloseable {
     /** Servicio de pacientes, para los casos de uso que lo necesiten en el servidor (CU13). */
     public IPacienteService pacientes() {
         return pacientes;
+    }
+
+    /** Consulta de pruebas de solo lectura, para CU09 (DEC-075). */
+    public IConsultaPruebas consultaPruebas() {
+        return consultaPruebas;
     }
 
     @Override
