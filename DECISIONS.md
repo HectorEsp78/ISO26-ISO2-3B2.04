@@ -1089,6 +1089,7 @@ Alinea la configuración con la Definition of Done y evita que se integre códig
 ⏳ Pendiente de aprobación
 
 ---
+
 ## DEC-061: Operación para comprobar si un paciente existe y está activo
 
 **Fecha:** 25/11/2026
@@ -1119,6 +1120,203 @@ Da a CU13, y a cualquier otro caso de uso que trabaje con pacientes, una forma �
 ⏳ Pendiente de aprobación
 
 ---
+
+## DEC-062: Modelo de la cita y sus estados
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU13. La cita y lo que viaja con ella por el protocolo (`Cita`, `EstadoCita`, `TipoPrueba`, `Recurso`) van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`.
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| DNI del paciente | `String` | Sí | Formato de la DEC-055. El paciente debe existir y estar `ACTIVO` (RN-01, DEC-064). |
+| Tipo de prueba | `TipoPrueba` | Sí | Del catálogo de ejemplo (DEC-047). |
+| Recurso | `Recurso` | Sí | De la lista de ejemplo (DEC-047). |
+| Inicio | `LocalDateTime` | Sí | Posterior al momento actual (RN-02) y, con el fin, dentro del horario de la DEC-044 (RN-03). |
+| Duración | `int` (minutos) | Sí | Mayor que 0. Por defecto, la del tipo de prueba. |
+| Estado | `EstadoCita` | Sí | `PROGRAMADA`, `CANCELADA` o `REALIZADA`. Lo asigna el sistema: la cita se crea `PROGRAMADA`. |
+| Motivo de cancelación | `String` | Solo al cancelar | Entre 1 y 255 caracteres (DEC-046). |
+
+- El fin de la cita no se guarda como dato propio del modelo: se calcula como inicio más duración.
+- Dos citas se solapan si el inicio de cada una es anterior al fin de la otra (RN-06, DEC-043).
+- `TipoPrueba` tiene identificador, nombre y duración en minutos. `Recurso` tiene identificador y nombre.
+- El estado `REALIZADA` se incluye ya en CU13, aunque solo lo usa CU10 (DEC-063). Esto modifica la DEC-042, que decía que lo añadiría CU10.
+
+### Alternativas consideradas
+
+Que CU10 añada el estado `REALIZADA` cuando lo necesite, como decía la DEC-042. Se descarta porque obligaría a dos personas a modificar la misma clase en ramas distintas y provocaría conflictos al integrar.
+
+### Justificación
+
+La especificación dejaba sin concretar los tipos y el lugar de las clases, y sin ellos no se puede programar ni diseñar las pruebas. Poner las entidades en `comun` sigue el mismo criterio que CU12.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-063: Interfaz del servicio de citas (`ICitaService`)
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Las reglas de negocio de las citas están en `CitaService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.citas`), y el resto del sistema solo depende de la interfaz `ICitaService`:
+
+| Operación | Quién la usa | Qué hace | Si falla |
+|---|---|---|---|
+| `asignarCita(datos)` | CU13 | Crea una cita `PROGRAMADA`. Comprueba RN-01 a RN-06. | No guarda nada. |
+| `buscarCitas(dni, desde, hasta, estado)` | CU13 | Devuelve las citas que cumplen los filtros (cualquiera puede ir vacío), ordenadas por inicio. | — |
+| `reprogramarCita(id, datos)` | CU13 | Cambia fecha, recurso o duración de la misma cita (DEC-045). Comprueba los solapes sin contar la propia cita (RN-07). | La cita no cambia. |
+| `cancelarCita(id, motivo)` | CU13 | Pasa la cita a `CANCELADA` con su motivo (DEC-046). Solo si está `PROGRAMADA` y no ha empezado (RN-08). | La cita no cambia. |
+| `listarTiposPrueba()`, `listarRecursos()` | CU13 | Catálogos de ejemplo para el formulario (DEC-047). | — |
+| `obtenerCita(id)` | CU10 | Devuelve la cita con ese identificador. | `CITA_NO_ENCONTRADA`. |
+| `marcarRealizada(id)` | CU10 | Pasa una cita `PROGRAMADA` a `REALIZADA`. **No** aplica RN-08. | La cita no cambia. |
+| `marcarCancelada(id, motivo)` | CU10 | Pasa una cita `PROGRAMADA` a `CANCELADA` con su motivo. **No** aplica RN-08. | La cita no cambia. |
+| `cancelarCitasPendientes(dni, motivo)` | CU12 | Al dar de baja a un paciente, pasa todas sus citas `PROGRAMADA` a `CANCELADA` con el motivo «Baja del paciente» (DEC-048). Devuelve cuántas ha cancelado. | No cambia ninguna. |
+
+- `datos` es un objeto `DatosCita` con lo que introduce el usuario: DNI, tipo de prueba, recurso, inicio y duración. Se llama así para no confundirlo con la solicitud de CU06.
+- Los errores se lanzan como `CitaException` con un código de la DEC-065.
+- CU10 y CU12 llaman a sus operaciones desde el propio servidor; no necesitan mensajes de socket.
+
+### Alternativas consideradas
+
+Que CU10 reutilice `cancelarCita`. Se descarta porque RN-08 solo permite cancelar citas que no han empezado, y cuando se registra una prueba la cita ya ha empezado.
+
+### Justificación
+
+Una sola interfaz para todas las operaciones sobre citas evita que otros casos de uso modifiquen el código de CU13 y permite que CU01, CU06, CU14 y CU15 la reutilicen más adelante.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-064: Comprobación del paciente al asignar o reprogramar una cita
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Para cumplir RN-01, `CitaService` usa la operación `comprobar(dni)` de CU12 (DEC-061):
+
+- Si el paciente no existe, la cita se rechaza con `PACIENTE_NO_ENCONTRADO`.
+- Si está de baja (`BAJA`), se rechaza con `PACIENTE_DE_BAJA`.
+- Si está `ACTIVO`, se siguen comprobando las demás reglas.
+
+El cliente puede usar `estaActivo(dni)` de `ServicioPacientes` para avisar antes de enviar, pero el servidor lo vuelve a comprobar siempre.
+
+Mientras el servidor de CU12 no ofrezca esta operación, `CitaService` recibe en su constructor el objeto que hace la comprobación, y en las pruebas se usa una versión simulada con DNI de ejemplo (uno activo, uno de baja y uno que no existe).
+
+### Alternativas consideradas
+
+Usar `BUSCAR_PACIENTE`. Se descarta por el mismo motivo que en la DEC-061: devuelve datos personales que CU13 no necesita.
+
+### Justificación
+
+Reutiliza la operación que CU12 ya ofrece para este fin y permite desarrollar y probar CU13 sin esperar a que el servidor de CU12 esté terminado.
+
+### Estado
+
+⏳ Pendiente de aprobación (falta confirmar con el responsable de CU12 el nombre de la interfaz en el servidor)
+
+---
+
+## DEC-065: Operaciones del protocolo de sockets para CU13
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039, con el mismo formato, escape y puerto que la DEC-057:
+
+| Petición | Respuesta correcta |
+|---|---|
+| `ASIGNAR_CITA;<datos>` | `OK;<cita>` |
+| `BUSCAR_CITAS;<dni>;<desde>;<hasta>;<estado>` | `OK;<n>;<cita1>;<cita2>…` |
+| `REPROGRAMAR_CITA;<id>;<idRecurso>;<inicio>;<duracion>` | `OK;<cita>` |
+| `CANCELAR_CITA;<id>;<motivo>` | `OK;<cita>` |
+| `LISTAR_TIPOS_PRUEBA` | `OK;<n>;<id>;<nombre>;<duracion>…` |
+| `LISTAR_RECURSOS` | `OK;<n>;<id>;<nombre>…` |
+
+- `<datos>` son 5 campos en este orden: `dni;idTipoPrueba;idRecurso;inicio;duracion`.
+- `<cita>` son 9 campos: `id;dni;idTipoPrueba;idRecurso;inicio;duracion;fin;estado;motivo`.
+- En `BUSCAR_CITAS` un filtro vacío significa «sin filtro». Las fechas van en ISO (`aaaa-mm-dd`) y la fecha y hora en ISO (`aaaa-mm-ddThh:mm`).
+- Gracias al escape de la DEC-057, el motivo de cancelación puede contener `;` o saltos de línea.
+- Los nombres de las operaciones van en una clase `ProtocoloCitas` del módulo `comun`.
+
+Códigos de error (se añaden a `CodigoError`; los marcados con * ya existen):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato (indica el campo, CA-02). Incluye duración ≤ 0 y motivo vacío o de más de 255 caracteres. |
+| `PACIENTE_NO_ENCONTRADO`* / `PACIENTE_DE_BAJA`* | RN-01 (DEC-064). |
+| `FECHA_PASADA` | El inicio es anterior al momento actual (RN-02). |
+| `FUERA_DE_HORARIO` | La cita no empieza y termina dentro del horario de la DEC-044 (RN-03). |
+| `SOLAPE_RECURSO` / `SOLAPE_PACIENTE` | Choca con otra cita `PROGRAMADA` del recurso o del paciente (RN-04, RN-05). El error indica con qué cita choca. |
+| `CITA_NO_ENCONTRADA` | No existe una cita con ese identificador. |
+| `CITA_NO_MODIFICABLE` | La cita no está `PROGRAMADA` o, al reprogramar o cancelar, ya ha empezado (RN-08). |
+
+### Justificación
+
+Mantiene un único formato de protocolo en todo el sistema y deja a CU13 un contrato cerrado entre cliente y servidor, como hizo CU12.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-066: Tablas de citas y control de solapes
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+- Se añaden al script SQL (DEC-031) las tablas `tipo_prueba`, `recurso` y `cita`, con los datos de ejemplo de la DEC-047.
+- La tabla `cita` guarda también la hora de fin (`fin`) para poder consultar los solapes directamente, con índices por recurso y por paciente.
+- La comprobación de solape y el guardado de la cita se hacen en **una sola transacción**, bloqueando las citas afectadas (`SELECT … FOR UPDATE`), para que dos peticiones a la vez no creen citas solapadas (DEC-043).
+
+### Alternativas consideradas
+
+Un método `synchronized` en `CitaService`. Es más sencillo y válido con un único servidor, pero deja de funcionar si algún día hay más de uno.
+
+### Justificación
+
+Garantiza RN-04 y RN-05 aunque dos administrativos asignen citas al mismo tiempo.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-067: Enlace entre la cita y la solicitud
+
+**Fecha:** 25/11/2026
+
+### Decisión
+
+La cita de CU13 no guarda ninguna referencia a la solicitud. Es la solicitud (CU06) la que guarda el identificador de su cita. CU10 obtiene la cita desde la solicitud con `obtenerCita(id)` (DEC-063).
+
+### Alternativas consideradas
+
+Que la cita guarde el identificador de la solicitud. Se descarta porque en CU13 todavía no existen las solicitudes (llegan en CU06) y obligaría a cambiar el modelo de la cita ya especificado.
+
+### Justificación
+
+Mantiene la cita tal y como está especificada en CU13 y deja el enlace en el caso de uso que crea la solicitud. Corrige el supuesto de la especificación de CU10 de que «la cita se obtiene de la solicitud».
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU06 y CU10)
+
+---
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -1134,3 +1332,4 @@ Da a CU13, y a cualquier otro caso de uso que trabaje con pacientes, una forma �
 | 24/11/2026 | Incorporadas las decisiones DEC-049 a DEC-054 derivadas de la sexta reunión de seguimiento (reparto individual de casos de uso, actualización del PUD, alcance de análisis, pruebas cruzadas y trabajo teórico). |
 | 25/11/2026 | Incorporadas las decisiones DEC-055 a DEC-060 derivadas del diseño de CU12 (datos del paciente, búsqueda por DNI, protocolo, módulo comun, estructura del cliente y cobertura), pendientes de aprobación. |
 | 25/11/2026 | Incorporada la decisión DEC-061 (operación COMPROBAR_PACIENTE para CU13), pendiente de aprobación. |
+| 25/11/2026 | Incorporadas las decisiones DEC-062 a DEC-067 derivadas del diseño de CU13 (modelo de la cita, interfaz del servicio, comprobación del paciente, protocolo, tablas y enlace con la solicitud), pendientes de aprobación. |
