@@ -1801,6 +1801,273 @@ Permite desarrollar y probar el cliente antes de que el servidor esté terminado
 
 ---
 
+## DEC-081: Modelo de la solicitud y de la prioridad
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Se concretan los datos del apartado 8 de la especificación de CU06. `Solicitud`, `DatosSolicitud`, `FiltroSolicitudes`, `EstadoSolicitud`, `Prioridad` y `ValidadorSolicitud` van en el módulo `comun` (DEC-058), paquete `es.uclm.esi.iso2.comun.dominio`, y los usan igual el cliente y el servidor (DEC-055). Antes de validar se eliminan los espacios del principio y del final de los textos.
+
+| Campo | Tipo | Obligatorio | Validación |
+|---|---|---|---|
+| Identificador | `long` | Automático | Lo asigna la base de datos. |
+| DNI del paciente | `String` | Sí | Formato de la DEC-055. El paciente debe existir y estar `ACTIVO` (RN-02, DEC-064). |
+| Médico solicitante | `String` | Sí | De 1 a 20 caracteres. Mientras no exista CU23 llega en cada petición y no se verifica contra una sesión (igual que DEC-072). |
+| Tipo de prueba | `int` | Sí | Del catálogo de ejemplo (DEC-047). Debe existir y estar activo (RN-03, DEC-082). |
+| Indicación clínica | `String` | Sí | Entre 1 y 500 caracteres. |
+| Justificación | `String` | Sí | Entre 1 y 500 caracteres. |
+| Prioridad | `Prioridad` | Sí | `URGENTE`, `PREFERENTE` u `ORDINARIO`. Sin valor por defecto (RN-05). |
+| Fecha de solicitud | `LocalDateTime` | Automático | La asigna el servidor al registrar (RN-06). |
+| Estado | `EstadoSolicitud` | Automático | `PENDIENTE_DE_CITAR` al crear (RN-06). |
+| Cita | `Long` | No | Vacía hasta que CU13 o CU15 asignen una cita (DEC-067 y DEC-087). |
+
+- `DatosSolicitud` es un objeto de solo lectura con lo que introduce el usuario: `dniPaciente`, `idTipoPrueba`, `indicacionClinica`, `justificacion` y `prioridad`. Se llama así para no confundirlo con `DatosCita` (DEC-063) ni con `DatosPrueba` (DEC-075).
+- `FiltroSolicitudes` es `(dniPaciente, estado, desde, hasta)`; cualquier campo puede ir vacío («sin filtro»). Lo usarán CU08 y CU10.
+- `EstadoSolicitud` incluye ya `PENDIENTE_DE_CITAR`, `CITADA`, `REALIZADA` y `CANCELADA`, aunque CU06 solo cree la primera. Se hace así para que CU08, CU10, CU13 y CU15 no tengan que modificar la misma clase en ramas distintas (mismo criterio que DEC-062 con `REALIZADA`).
+- `ValidadorSolicitud` devuelve el primer error como `ErrorCampo` (el tipo que introduce CU10 en DEC-070), con el nombre de campo de `ProtocoloSolicitudes` (DEC-084), no como `CampoPaciente`, porque estos campos no son del paciente.
+
+### Alternativas consideradas
+
+Usar `ErrorValidacion` y `CampoPaciente` como CU12. Se descarta porque `CampoPaciente` solo enumera los campos de un paciente y la solicitud tiene campos propios.
+
+### Justificación
+
+La especificación deja entre corchetes los tipos y las longitudes, y sin ellos no se pueden programar las validaciones ni diseñar los casos de prueba (clases de equivalencia y valores límite). Poner las entidades en `comun` sigue el criterio de CU12, CU13, CU09 y CU10.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-082: Catálogo de tipos de prueba con requisitos y estado activo
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+CU06 necesita mostrar, antes de confirmar, la preparación previa, el uso de contraste y el consentimiento informado de cada tipo de prueba (paso 4 y CA-07), y solo ofrecer los tipos activos (RN-03). Por eso se amplía el catálogo de DEC-047 y DEC-062:
+
+- `TipoPrueba` (módulo `comun`, paquete `dominio`) pasa de `(id, nombre, duracionMinutos)` a `(id, nombre, duracionMinutos, preparacion, requiereContraste, requiereConsentimiento, activo)`.
+  - `preparacion`: texto de 0 a 500 caracteres; la cadena vacía significa «no requiere preparación».
+  - `requiereContraste` y `requiereConsentimiento`: `boolean`.
+  - `activo`: `boolean`. Un tipo inactivo no se puede elegir (FA-03, CA-04).
+- La tabla `tipo_prueba` (DEC-066) añade las columnas `preparacion VARCHAR(500) NULL`, `requiere_contraste BOOLEAN NOT NULL DEFAULT FALSE`, `requiere_consentimiento BOOLEAN NOT NULL DEFAULT FALSE` y `activo BOOLEAN NOT NULL DEFAULT TRUE`.
+- `02_datos.sql` (DEC-031) rellena esos valores para los cinco tipos de ejemplo. Son valores inventados para desarrollo, no un catálogo clínico real.
+- Se añade la interfaz `ICatalogoPruebas` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.solicitudes`):
+
+| Operación | Qué hace | Si falla |
+|---|---|---|
+| `listarTiposPruebaActivos()` | Devuelve los tipos con `activo = true`, ordenados por nombre. | — |
+| `obtenerTipoPrueba(id)` | Devuelve el tipo con ese identificador. | `TIPO_PRUEBA_NO_ENCONTRADO`. |
+
+- Hasta que exista CU17 (configuración del catálogo), `ICatalogoPruebas` lo implementa CU13 sobre la tabla `tipo_prueba`; `SolicitudService` lo recibe en su constructor y en las pruebas se usa una versión simulada.
+- El protocolo de CU13 (DEC-065) no cambia: `LISTAR_TIPOS_PRUEBA` sigue enviando `id;nombre;duracion`. Los campos nuevos solo los usa CU06 con su propia operación (DEC-084).
+
+### Alternativas consideradas
+
+Crear un `TipoPruebaDetalle` aparte solo para CU06. Se descarta porque habría dos representaciones del mismo catálogo y podrían desincronizarse.
+
+### Justificación
+
+El catálogo es el mismo para citas y solicitudes, y ampliarlo en un solo sitio evita duplicar datos. Requiere que el responsable de CU13 actualice la construcción de `TipoPrueba` y su DAO; el contrato de CU13 no se rompe.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con el responsable de CU13)
+
+---
+
+## DEC-083: Interfaz del servicio de solicitudes (`ISolicitudService`)
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Las reglas de negocio de CU06 están en `SolicitudService` (módulo `servidor`, paquete `es.uclm.esi.iso2.servidor.solicitudes`) y el resto del sistema solo depende de la interfaz `ISolicitudService`:
+
+| Operación | Quién la usa | Qué hace | Si falla |
+|---|---|---|---|
+| `crearSolicitud(idMedico, datos)` | CU06 | Crea una solicitud `PENDIENTE_DE_CITAR`. Comprueba RN-01 a RN-06. | No guarda nada. |
+| `obtenerSolicitud(id)` | CU08, CU10, CU13, CU15 | Devuelve la solicitud con ese identificador. | `SOLICITUD_NO_ENCONTRADA`. |
+| `buscarSolicitudes(idMedico, filtro)` | CU08, CU10 | Devuelve las solicitudes del médico que cumplen los filtros, ordenadas por fecha de solicitud de más antigua a más reciente. | — |
+| `solicitudesConCita(idMedico, dni)` | CU10 | Devuelve las solicitudes del médico con cita asignada; `dni` vacío significa «todas». | — |
+| `asignarCita(idSolicitud, idCita)` | CU13, CU15 | Pasa una solicitud `PENDIENTE_DE_CITAR` a `CITADA` y guarda el identificador de su cita (DEC-067). | `SOLICITUD_NO_MODIFICABLE` si ya no está pendiente. |
+| `marcarRealizada(idSolicitud)` | CU10 | Pasa una solicitud `CITADA` a `REALIZADA` (DEC-077). | `SOLICITUD_NO_MODIFICABLE`. |
+| `marcarCancelada(idSolicitud)` | CU10 | Pasa una solicitud `PENDIENTE_DE_CITAR` o `CITADA` a `CANCELADA` (DEC-077). | `SOLICITUD_NO_MODIFICABLE`. |
+
+- `datos` es un `DatosSolicitud` (DEC-081); `idMedico` viaja aparte, como primer campo de la petición (DEC-072).
+- Los errores se lanzan como `SolicitudException` con un código de la DEC-084.
+- `SolicitudService` recibe en su constructor `ISolicitudDAO` (o `SolicitudDAO`), `IPacienteService` (CU12, DEC-061), `ICatalogoPruebas` (DEC-082) y un `Clock` para la fecha de solicitud. Así se puede desarrollar y probar sin que CU12 y CU13 estén integrados.
+- CU13 y CU15 llaman a `asignarCita` desde el propio servidor, no por sockets.
+- Para que CU10 deje de usar su versión provisional `SolicitudesDePrueba.SIN_CU06`, se añade un adaptador `SolicitudesDePruebaAdapter` que envuelve `ISolicitudService` y traduce `Solicitud` a `SolicitudDePrueba` (DEC-075). Con él, CU10 solo cambia la línea de `Servidor.crear` que hoy pasa `SIN_CU06`.
+
+### Alternativas consideradas
+
+Que CU10 siga con su interfaz `SolicitudesDePrueba` y CU06 tenga otra distinta. Se descarta porque obligaría a mantener dos contratos para los mismos datos y a duplicar consultas.
+
+### Justificación
+
+Una sola interfaz para todas las operaciones sobre solicitudes evita que CU07, CU08, CU10, CU13, CU14 y CU15 modifiquen el código de CU06, igual que DEC-063 con las citas y DEC-075 con las pruebas.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU10 y CU13)
+
+---
+
+## DEC-084: Operaciones del protocolo de sockets para CU06
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Se amplía el protocolo de la DEC-039 con el mismo formato, escape y puerto que la DEC-057. Como en CU09 y CU10, las peticiones que lo necesitan llevan el identificador del médico.
+
+| Petición | Respuesta correcta |
+|---|---|
+| `CREAR_SOLICITUD;<idMedico>;<dni>;<idTipoPrueba>;<indicacion>;<justificacion>;<prioridad>` | `OK;<solicitud>` |
+| `OBTENER_SOLICITUD;<idMedico>;<idSolicitud>` | `OK;<solicitud>` |
+| `BUSCAR_SOLICITUDES;<idMedico>;<dni>;<estado>;<desde>;<hasta>` | `OK;<n>;<solicitud1>;<solicitud2>…` |
+| `LISTAR_TIPOS_PRUEBA_ACTIVOS` | `OK;<n>;<tipo1>;<tipo2>…` |
+
+- `<solicitud>` son 10 campos: `id;dni;idMedico;idTipoPrueba;indicacion;justificacion;prioridad;fechaSolicitud;estado;idCita`.
+- `<tipo>` son 6 campos: `id;nombre;duracion;preparacion;requiereContraste;requiereConsentimiento`. Todos los tipos devueltos están activos, por eso no se envía `activo`.
+- En `BUSCAR_SOLICITUDES` un filtro vacío significa «sin filtro». Las fechas de los filtros van en ISO (`aaaa-mm-dd`) y `fechaSolicitud` en ISO (`aaaa-mm-ddThh:mm`).
+- El campo `idCita` va vacío mientras la solicitud no tenga cita.
+- Gracias al escape de la DEC-057, la indicación y la justificación pueden contener `;` o saltos de línea.
+- Los nombres de las operaciones y de los campos van en una clase `ProtocoloSolicitudes` del módulo `comun`.
+
+Códigos de error (se añaden a `CodigoError` en el bloque `// --- CU06 ---`; los marcados con * ya existen):
+
+| Código | Cuándo |
+|---|---|
+| `CAMPO_OBLIGATORIO`* / `CAMPO_NO_VALIDO`* | Falta un dato o tiene mal formato (indica el campo, CA-02). Incluye indicación o justificación de más de 500 caracteres, prioridad desconocida e `idTipoPrueba` no numérico. |
+| `PACIENTE_NO_ENCONTRADO`* / `PACIENTE_DE_BAJA`* | El paciente no existe o está de baja (RN-02, CA-03). |
+| `TIPO_PRUEBA_NO_ENCONTRADO` | No existe el tipo de prueba (RN-03, CA-04). |
+| `TIPO_PRUEBA_INACTIVO` | El tipo de prueba existe pero no está activo (RN-03, CA-04). |
+| `SOLICITUD_NO_ENCONTRADA`* | No existe la solicitud. La define también CU10 (DEC-078): conservar una sola al integrar. |
+| `SOLICITUD_NO_MODIFICABLE` | La solicitud no está en un estado que permita el cambio (DEC-087). |
+| `PETICION_NO_VALIDA`* / `ERROR_INTERNO`* | Operación desconocida o número de campos incorrecto; fallo del servidor. |
+
+- El tercer campo de un error es un texto libre («detalle»: nombre de un campo o un identificador), como generaliza la DEC-070.
+
+### Justificación
+
+Mantiene un único formato de protocolo en todo el sistema y deja a CU06 un contrato cerrado entre cliente y servidor, como hicieron CU12, CU13, CU09 y CU10.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-085: Tablas de solicitudes y del catálogo
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+- Se añade al script SQL (DEC-031) la tabla `solicitud`:
+
+| Columna | Tipo | Restricciones |
+|---|---|---|
+| `id` | `BIGINT` | `AUTO_INCREMENT`, clave primaria. |
+| `dni_paciente` | `CHAR(9)` | `NOT NULL`. |
+| `id_medico` | `VARCHAR(20)` | `NOT NULL`. |
+| `id_tipo_prueba` | `INT` | `NOT NULL`, clave ajena a `tipo_prueba`. |
+| `indicacion_clinica` | `VARCHAR(500)` | `NOT NULL`. |
+| `justificacion` | `VARCHAR(500)` | `NOT NULL`. |
+| `prioridad` | `VARCHAR(10)` | `NOT NULL`, `CHECK` `URGENTE`/`PREFERENTE`/`ORDINARIO`. |
+| `fecha_solicitud` | `DATETIME` | `NOT NULL`. |
+| `estado` | `VARCHAR(20)` | `NOT NULL DEFAULT 'PENDIENTE_DE_CITAR'`, `CHECK` de los cuatro estados. |
+| `id_cita` | `BIGINT` | `NULL`, `UNIQUE`. |
+
+- Índices por (`id_medico`, `fecha_solicitud`), por `dni_paciente` y por `estado`.
+- `id_cita` es `UNIQUE` para que una cita no se asigne a dos solicitudes. No lleva clave ajena a `cita` ni `dni_paciente` a `paciente`, para no atar el esquema al de CU13 y CU12 (mismo criterio que DEC-066 y DEC-079): el servidor comprueba todo antes de guardar.
+- La tabla `tipo_prueba` se amplía con las columnas de la DEC-082 y `02_datos.sql` rellena los requisitos de los tipos de ejemplo.
+- Atomicidad y concurrencia:
+  - `crearSolicitud` valida todo antes de insertar; si algo falla, no se guarda nada.
+  - `asignarCita` es un `UPDATE … WHERE id = ? AND estado = 'PENDIENTE_DE_CITAR'`. Si no cambia ninguna fila, se responde `SOLICITUD_NO_MODIFICABLE`, de modo que una solicitud no se cita dos veces.
+  - `marcarRealizada` y `marcarCancelada` son actualizaciones condicionadas al estado (`UPDATE … WHERE id = ? AND estado IN (…)`); si no cambia ninguna fila, se responde `SOLICITUD_NO_MODIFICABLE`.
+  - No hace falta una transacción de varias tablas dentro de CU06. La operación que sí abarca varias tablas es el registro de la prueba de CU10 (DEC-076), que llamará a `marcarRealizada` o `marcarCancelada`; si esa llamada falla, CU10 compensa como ya describe la DEC-076.
+
+### Alternativas consideradas
+
+Guardar la relación cita-solicitud en la tabla `cita` en lugar de en `solicitud`. Se descarta porque la DEC-067 ya fijó que es la solicitud la que guarda el identificador de su cita.
+
+### Justificación
+
+La restricción `UNIQUE` sobre `id_cita` y las actualizaciones condicionadas garantizan los estados coherentes aunque dos peticiones lleguen a la vez, sin depender de `synchronized`.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-086: Estructura del cliente de CU06
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+El cliente de CU06 sigue la estructura de la DEC-059, la DEC-073 y la DEC-080:
+
+- **Presentación** (`es.uclm.esi.iso2.cliente.presentacion`), con FXML y sin lógica: `PantallaSolicitudPrueba` (búsqueda del paciente con CU12 y botón «Nueva solicitud») y `FormularioSolicitud` (selector de tipo de prueba, requisitos del tipo elegido, indicación, justificación y prioridad). Si la operación falla, el formulario sigue abierto con lo introducido (FA-07).
+- **Lógica** (`es.uclm.esi.iso2.cliente.logica`): `GestorSolicitudesCliente` valida antes de enviar con `ValidadorSolicitud` y traduce los códigos de error de la DEC-084 en mensajes claros con `MensajesSolicitud` (los campos de la solicitud son texto libre, no `CampoPaciente`, así que no se reutiliza `MensajesError` de CU12).
+- **Servicio** (`es.uclm.esi.iso2.cliente.servicio`): la interfaz `ServicioSolicitudes` con `ServicioSolicitudesSocket` (real) y `ServicioSolicitudesEnMemoria` (aplica las mismas reglas sin red, para probar la interfaz y las pruebas JUnit).
+- `FabricaServicio` (DEC-059) añade un método `crearSolicitudes(propiedades)` que comparte el modo (`socket`/`memoria`), el host y el puerto con `crear(propiedades)`; el arranque crea los dos servicios (pacientes y solicitudes).
+- El catálogo se pide al servidor con `LISTAR_TIPOS_PRUEBA_ACTIVOS`; en modo memoria se sirve un catálogo de ejemplo con los mismos cinco tipos de `02_datos.sql`.
+- Mientras no exista CU23, el identificador del médico se configura al arrancar el cliente (DEC-072).
+- La cobertura de ramas del 75 % excluye el paquete `presentacion` (DEC-060).
+
+### Justificación
+
+Permite desarrollar y probar el cliente antes de que el servidor esté terminado y mantiene la misma estructura en todos los casos de uso.
+
+### Estado
+
+⏳ Pendiente de aprobación
+
+---
+
+## DEC-087: Ciclo de vida de la solicitud y coordinación con otros casos de uso
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+- Estados y transiciones:
+
+| Estado inicial | Operación | Estado final | Quién |
+|---|---|---|---|
+| — | `crearSolicitud` | `PENDIENTE_DE_CITAR` | CU06 |
+| `PENDIENTE_DE_CITAR` | `asignarCita` | `CITADA` (con `idCita`) | CU13, CU15 |
+| `CITADA` | `marcarRealizada` | `REALIZADA` | CU10 |
+| `PENDIENTE_DE_CITAR` o `CITADA` | `marcarCancelada` | `CANCELADA` | CU10, CU08 |
+
+- `REALIZADA` y `CANCELADA` son estados finales.
+- CU06 no ofrece modificar ni borrar una solicitud ya registrada (RN-09). Los cambios de estado se hacen solo con las operaciones de la DEC-083 que usan CU08, CU10, CU13 y CU15; CU06 no los expone por sockets.
+- `asignarCita` es la única forma de rellenar `id_cita`; la cita de CU13 no guarda el identificador de la solicitud (DEC-067).
+- CU07 (prueba de seguimiento) añadirá la periodicidad a la solicitud como especialización de CU06; no forma parte de esta iteración.
+- **Pendiente de coordinar con CU12:** al dar de baja a un paciente (DEC-048), además de cancelar sus citas `PROGRAMADA`, deberían pasar a `CANCELADA` sus solicitudes `PENDIENTE_DE_CITAR` y `CITADA`. La solicitud no guarda motivo de cancelación (la especificación no lo pide), así que el motivo solo quedaría en la cita. Hay que acordar con el responsable de CU12 si se añade ese campo o si basta con el estado.
+
+### Alternativas consideradas
+
+Que CU13 escriba directamente en la tabla `solicitud`. Se descarta porque rompe la separación por casos de uso y la DEC-067.
+
+### Justificación
+
+Deja claro qué caso de uso cambia cada estado y evita que dos personas modifiquen la misma tabla desde códigos distintos, que es el principal riesgo al integrar CU06 con CU08, CU10, CU13 y CU15.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU08, CU10, CU12, CU13 y CU15)
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -1818,3 +2085,4 @@ Permite desarrollar y probar el cliente antes de que el servidor esté terminado
 | 25/11/2026 | Incorporada la decisión DEC-061 (operación COMPROBAR_PACIENTE para CU13), pendiente de aprobación. |
 | 25/11/2026 | Incorporadas las decisiones DEC-062 a DEC-067 derivadas del diseño de CU13 (modelo de la cita, interfaz del servicio, comprobación del paciente, protocolo, tablas y enlace con la solicitud), pendientes de aprobación. |
 | 26/11/2026 | Incorporadas las decisiones DEC-074 a DEC-080 derivadas del diseño de CU10 (modelo de la prueba, interfaces, registro atómico, estados, protocolo, tablas y cliente), pendientes de aprobación. |
+| 27/11/2026 | Incorporadas las decisiones DEC-081 a DEC-087 derivadas del diseño de CU06 (modelo de la solicitud, catálogo con requisitos, interfaz del servicio, protocolo, tablas, cliente y ciclo de vida), pendientes de aprobación. |
