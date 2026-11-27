@@ -33,4 +33,18 @@ public enum CodigoError {
     PACIENTE_NO_ENCONTRADO,
     /** El paciente está dado de baja: no se puede modificar ni dar de baja otra vez. */
     PACIENTE_DE_BAJA,
+
+    // --- CU13 ---
+    /** El inicio de la cita es anterior al momento actual (RN-02). */
+    FECHA_PASADA,
+    /** La cita no empieza y termina de lunes a viernes entre las 08:00 y las 20:00 (RN-03, DEC-044). */
+    FUERA_DE_HORARIO,
+    /** Choca con otra cita PROGRAMADA del mismo recurso (RN-04). La respuesta indica su id. */
+    SOLAPE_RECURSO,
+    /** Choca con otra cita PROGRAMADA del mismo paciente (RN-05). La respuesta indica su id. */
+    SOLAPE_PACIENTE,
+    /** No existe ninguna cita con ese identificador. */
+    CITA_NO_ENCONTRADA,
+    /** La cita no está PROGRAMADA o, al reprogramar o cancelar, ya ha empezado (RN-08). */
+    CITA_NO_MODIFICABLE,
 }

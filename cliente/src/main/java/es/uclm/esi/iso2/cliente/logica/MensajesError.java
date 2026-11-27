@@ -58,6 +58,13 @@ public final class MensajesError {
             case ERROR_INTERNO -> "Se ha producido un error en el servidor. Inténtalo de nuevo más tarde.";
             case SIN_CONEXION -> "No hay conexión con el servidor. Comprueba que está en marcha e inténtalo de nuevo.";
             case RESPUESTA_NO_VALIDA -> "El servidor ha enviado una respuesta no válida. Avisa al administrador del sistema.";
+            // CU13 Gestionar citas médicas (DEC-065)
+            case FECHA_PASADA -> "La cita debe empezar después del momento actual.";
+            case FUERA_DE_HORARIO -> "La cita debe empezar y terminar de lunes a viernes, entre las 08:00 y las 20:00.";
+            case SOLAPE_RECURSO -> "El recurso ya tiene otra cita a esa hora.";
+            case SOLAPE_PACIENTE -> "El paciente ya tiene otra cita a esa hora.";
+            case CITA_NO_ENCONTRADA -> "No existe esa cita.";
+            case CITA_NO_MODIFICABLE -> "La cita ya no se puede modificar: está cancelada o realizada, o ya ha empezado.";
         };
     }
 
