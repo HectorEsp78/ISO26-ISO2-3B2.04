@@ -2068,6 +2068,110 @@ Deja claro qué caso de uso cambia cada estado y evita que dos personas modifiqu
 
 ---
 
+## DEC-088: Enlace de la cita con la solicitud al asignarla
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Se concreta cómo llega a CU13 el identificador de la solicitud que hay que enlazar con una cita. Esta decisión modifica la DEC-063, la DEC-065, la DEC-083 y la DEC-087.
+
+- `DatosCita` (DEC-063) añade un campo `Long idSolicitud` al final. Puede ser `null`: significa que la cita no viene de una solicitud.
+- La petición `ASIGNAR_CITA` (DEC-065) pasa de 5 a 6 campos: `dni;idTipoPrueba;idRecurso;inicio;duracion;idSolicitud`. El último campo vacío equivale a `null`. Hay que actualizar `ProtocoloCitas.CAMPOS_DATOS`, el cliente de CU13 y sus pruebas.
+- Si `idSolicitud` no es `null`, `CitaService.asignarCita` hace lo siguiente:
+  1. Comprueba que la solicitud existe y está `PENDIENTE_DE_CITAR` antes de crear la cita. Si no existe, responde `SOLICITUD_NO_ENCONTRADA`; si no está pendiente, `SOLICITUD_NO_MODIFICABLE`.
+  2. Crea la cita con `guardarSinSolapes` (DEC-066).
+  3. Llama a `ISolicitudService.asignarCita(idSolicitud, cita.id())` (DEC-083).
+- La comprobación previa no sustituye a la actualización condicionada de CU06: si la solicitud cambia entre la comprobación y el enlace, `asignarCita` falla y se compensa la cita.
+- Si el paso 3 falla después de crear la cita, se borra la cita recién creada. Si no se puede borrar, se cancela y se registra en el log para corregirlo a mano. Cuando CU06 y CU13 puedan compartir una transacción de MySQL, se usará esa transacción y no hará falta compensar (mismo criterio que DEC-076).
+- `CitaService` traduce los errores de CU06 a `CitaException` con el mismo código, para que `OperacionesCitas` siga dependiendo solo de CU13 y no de CU06.
+- La cita sigue sin guardar `idSolicitud` (DEC-067). El enlace se guarda solo en `solicitud.id_cita`, y `asignarCita` sigue siendo la única operación que lo rellena (DEC-087).
+- Las citas que no vienen de una solicitud se crean igual que hasta ahora, con `idSolicitud` vacío. CU15 usará el mismo camino cuando asigne una cita a una solicitud.
+
+### Alternativas consideradas
+
+Que CU13 no enlace la cita y que el enlace lo haga siempre CU15. Se descarta porque CU13 también puede asignar una cita a una solicitud y, si no lo hace, la solicitud se queda `PENDIENTE_DE_CITAR` para siempre.
+
+Usar una operación separada `ASIGNAR_CITA_A_SOLICITUD` después de `ASIGNAR_CITA`. Se descarta porque son dos peticiones y es más fácil que una se ejecute y la otra no.
+
+### Justificación
+
+Sin este campo, `ISolicitudService.asignarCita(idSolicitud, idCita)` no se puede invocar desde CU13, porque el protocolo de citas solo lleva los datos de la cita. Añadir el campo opcional mantiene las citas sin solicitud y cierra el enlace que exigen la DEC-067 y la DEC-087.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU10, CU13 y CU15)
+
+---
+
+## DEC-089: Cancelación de la cita y liberación de la solicitud
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Se completa el ciclo de vida de la DEC-087 para cuando una cita enlazada deja de estar `PROGRAMADA` sin que se haya registrado una prueba.
+
+- Se añade a `ISolicitudService` (DEC-083) la operación `desasignarCita(long idCita)`:
+  - Si existe una solicitud `CITADA` con ese `id_cita`, la pasa a `PENDIENTE_DE_CITAR` y deja `id_cita` vacío.
+  - Si no existe ninguna solicitud con esa cita, no hace nada.
+  - Si existe pero no está `CITADA`, no la modifica y lo registra en el log.
+- `CitaService.cancelarCita` (DEC-046), después de cancelar la cita, llama a `ISolicitudService.desasignarCita(idCita)`. Así la solicitud vuelve a estar pendiente de citar y se puede asignar otra cita.
+- Si falla `desasignarCita`, la cita queda cancelada y se registra en el log. No se revierte la cancelación porque la cita ya no está `PROGRAMADA`; cuando exista una transacción compartida se hará todo o nada.
+- Reprogramar una cita (DEC-045) no cambia el estado de la solicitud: sigue `CITADA` y conserva el mismo `id_cita`.
+- Para CU12, la baja del paciente no libera las solicitudes: las cancela. La operación concreta queda pendiente de acordar con CU12 (por ejemplo, `cancelarSolicitudesDePaciente(dni)`), porque `buscarSolicitudes` exige `idMedico`. Deberá pasar a `CANCELADA` las solicitudes `PENDIENTE_DE_CITAR` y `CITADA` del paciente, además de cancelar sus citas `PROGRAMADA`.
+- `desasignarCita` no se expone por sockets: la usan CU13 y CU15 desde el propio servidor, igual que `asignarCita`.
+
+### Alternativas consideradas
+
+Dejar la solicitud `CITADA` con una cita cancelada. Se descarta porque `asignarCita` solo acepta solicitudes `PENDIENTE_DE_CITAR`, así que esa solicitud ya no se podría volver a citar.
+
+Pasar siempre la solicitud a `CANCELADA` al cancelar la cita. Se descarta porque cancelar una cita no significa cancelar la prueba solicitada: el paciente puede seguir necesitando la prueba y solo se ha anulado la cita.
+
+### Justificación
+
+Cierra el caso que la DEC-087 dejaba abierto y evita solicitudes bloqueadas en `CITADA` cuando su cita ya no existe. Mantiene la separación: CU13 cancela la cita y CU06 cambia el estado de la solicitud.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU08, CU12, CU13 y CU15)
+
+---
+
+## DEC-090: Adaptador de CU10 y semántica de `solicitudesConCita`
+
+**Fecha:** 27/11/2026
+
+### Decisión
+
+Se concreta el adaptador que sustituye a `SolicitudesDePrueba.SIN_CU06` (DEC-083) y el contrato de `solicitudesConCita`.
+
+- `solicitudesConCita(idMedico, dni)` devuelve solo las solicitudes del médico con `estado = CITADA` y `id_cita` no nulo. `dni` vacío significa «todas». El orden no importa: CU10 vuelve a ordenar por inicio de la cita.
+- `SolicitudesDePruebaAdapter` implementa `SolicitudesDePrueba` (CU10) y envuelve `ISolicitudService`:
+  - `buscar(idSolicitud)` → `obtenerSolicitud(idSolicitud)`; si no existe, devuelve `Optional.empty()`.
+  - `conCitaDelMedico(idMedico, dni)` → `solicitudesConCita(idMedico, dni)`, traduciendo cada `Solicitud` a `SolicitudDePrueba`.
+  - `marcarRealizada(idSolicitud)` y `marcarCancelada(idSolicitud)` → las operaciones de CU06.
+- Para traducir `idTipoPrueba` al nombre que espera `SolicitudDePrueba.tipoPrueba`, el adaptador recibe `ICatalogoPruebas` (DEC-082) y usa `obtenerTipoPrueba(id).nombre()`. La prioridad se envía como `prioridad().name()`.
+- El adaptador vive en CU10 (`es.uclm.esi.iso2.servidor.pruebas`) porque implementa la interfaz provisional de CU10. CU06 solo expone `ISolicitudService` y `Solicitud`; no depende de CU10.
+- En `Servidor.crear` se crea `SolicitudService`, un `CatalogoPruebas` y el adaptador, y se pasa el adaptador a `PruebaService` en lugar de `SIN_CU06`. `SIN_CU06` puede quedarse para pruebas aisladas de CU10, pero el servidor real no debe usarlo.
+- El `CatalogoPruebas` que implementa `ICatalogoPruebas` debe ser una clase independiente de `CitaService`, para no crear un ciclo: `SolicitudService` necesita el catálogo y `CitaService` necesita `ISolicitudService` (DEC-088). Puede envolver el mismo `CitaDAO` o un DAO propio.
+
+### Alternativas consideradas
+
+Que CU06 implemente `SolicitudesDePrueba`. Se descarta porque obligaría a CU06 a depender de la interfaz provisional de CU10 y a mantener dos contratos.
+
+Que el adaptador consulte el nombre del tipo por sockets. Se descarta porque el adaptador está en el servidor y puede usar `ICatalogoPruebas` directamente.
+
+### Justificación
+
+Deja cerrado el contrato que hoy no funciona con `SIN_CU06` y evita que CU10 y CU06 dupliquen consultas o dependan de la representación interna del otro.
+
+### Estado
+
+⏳ Pendiente de aprobación (de acuerdo con los responsables de CU10 y CU13)
+
+---
+
 ## Historial de modificaciones
 
 | Fecha | Cambio |
@@ -2086,3 +2190,4 @@ Deja claro qué caso de uso cambia cada estado y evita que dos personas modifiqu
 | 25/11/2026 | Incorporadas las decisiones DEC-062 a DEC-067 derivadas del diseño de CU13 (modelo de la cita, interfaz del servicio, comprobación del paciente, protocolo, tablas y enlace con la solicitud), pendientes de aprobación. |
 | 26/11/2026 | Incorporadas las decisiones DEC-074 a DEC-080 derivadas del diseño de CU10 (modelo de la prueba, interfaces, registro atómico, estados, protocolo, tablas y cliente), pendientes de aprobación. |
 | 27/11/2026 | Incorporadas las decisiones DEC-081 a DEC-087 derivadas del diseño de CU06 (modelo de la solicitud, catálogo con requisitos, interfaz del servicio, protocolo, tablas, cliente y ciclo de vida), pendientes de aprobación. |
+| 27/11/2026 | Incorporadas las decisiones DEC-088 a DEC-090 (enlace de la cita con la solicitud, liberación al cancelar la cita y adaptador de CU10), pendientes de aprobación. |
